@@ -964,16 +964,20 @@ async fn submit_from(
         let a = approvals.entry(strk).or_default();
         *a = a.saturating_add(fee);
     }
+    // STRK the batch itself pulls from the submitter (pool fee, STRK deposits):
+    // the gas is paid from what is left.
+    let strk_spent = approvals.get(&strk).copied().unwrap_or(0);
     let mut calls: Vec<Call> = approvals.into_iter().map(|(t, a)| approve(t, target.pool, a)).collect();
     calls.push(prepared.call.clone());
 
     let calldata = wallet_core::encode_calls(&calls);
     let nonce = target.node.get_nonce(&sender).await.map_err(node_err)?;
-    let bounds = target
+    let padded = target
         .node
         .estimate_invoke_with_proof(&sender, &calldata, &nonce, &prepared.proved.proof_facts, &prepared.proved.proof)
         .await
         .map_err(submit_err)?;
+    let bounds = crate::fee::fit_bounds_to_balance(target.node.as_ref(), &sender, padded, strk_spent).await?;
     let session = target.session.lock().await;
     if let Some(g) = &target.guard {
         g.check(&session, submitter)?;
@@ -999,7 +1003,13 @@ async fn submit_from(
         .node
         .add_invoke(&sender, &signed.calldata, &signed.signature, &nonce, &bounds, &prepared.proved.proof_facts, Some(&prepared.proved.proof))
         .await
-        .map_err(submit_err)
+        .map_err(|e| {
+            if crate::fee::is_exceed_balance(&e.to_string()) {
+                crate::fee::broadcast_error(e, &bounds)
+            } else {
+                submit_err(e)
+            }
+        })
 }
 
 // ── handlers ─────────────────────────────────────────────────────────────────

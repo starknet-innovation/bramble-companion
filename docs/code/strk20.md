@@ -92,7 +92,11 @@ Sepolia test pool `0x03016a46…6323` uses the public test key `0xCAFEBABE`.
 in STRK: 2.5 STRK on mainnet in October 2026, 0 on strkd's Sepolia test pool).
 Submissions from the account approve it alongside the deposits; the AVNU relay
 passes it on in its fee withdraw. A deposit is checked against the account's
-public balance before the screening prover is called.
+public balance before the screening prover is called. A submission from an
+account fits its gas bounds to the STRK left after the pool fee and STRK
+deposits, or fails with `INSUFFICIENT_BALANCE_FOR_BOUNDS` (`-32006`; for
+`companion_strk20Prove`, the job's `error_reason`): see
+[Fee bounds](./wallet-rpc.md#fee-bounds).
 
 **Prover errors.** A local proving failure comes back as `163` (unknown error)
 with a `data.reason` (`PROVING_FAILED`, `INVALID_SIGNATURE`, `WIPED_ON_LOCK`) and

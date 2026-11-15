@@ -606,6 +606,11 @@ async fn deploy_account(
         Ok(b) => b,
         Err(e) => fail!(-32004, e.to_string()),
     };
+    // Fit the bounds to the account's STRK balance (#61): it pays its own deploy.
+    let bounds = match wallet_rpc::fit_bounds_to_balance(node.as_ref(), &d.address, bounds, 0).await {
+        Ok(b) => b,
+        Err(e) => fail!(e.code(), e.message()),
+    };
 
     let params = wallet_core::InvokeV3Params {
         nonce: wallet_core::Felt::ZERO,
@@ -630,7 +635,10 @@ async fn deploy_account(
         .await
     {
         Ok(h) => h,
-        Err(e) => fail!(-32004, e.to_string()),
+        Err(e) => {
+            let e = wallet_rpc::fee::broadcast_error(e, &bounds);
+            fail!(e.code(), e.message())
+        }
     };
 
     let tx = format!("0x{:x}", hash);

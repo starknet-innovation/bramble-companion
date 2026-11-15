@@ -29,6 +29,8 @@ struct MockNode {
     all_deployed: bool,
     /// What `balance_of` returns (fri).
     balance: u128,
+    /// When set, `add_invoke` fails with this node error text.
+    refuse_add: Option<String>,
 }
 
 #[async_trait]
@@ -58,6 +60,9 @@ impl StarknetRpc for MockNode {
         _proof_facts: &[Felt],
         _proof: Option<&str>,
     ) -> Result<Felt, NodeError> {
+        if let Some(e) = &self.refuse_add {
+            return Err(NodeError::Rpc(e.clone()));
+        }
         Ok(self.hash)
     }
     async fn is_deployed(&self, address: &Felt) -> Result<bool, NodeError> {
@@ -144,6 +149,7 @@ fn state_with_node_opts(
         deployed,
         all_deployed,
         balance: 1_000_000_000_000_000_000, // 1 STRK
+        refuse_add: None,
     };
     Arc::new(
         ServerState::new(
@@ -521,6 +527,7 @@ async fn strk20_balances_need_approval() {
         deployed: vec![],
         all_deployed: false,
         balance: 0,
+        refuse_add: None,
     };
     state.set_node(ChainId::Sepolia, Some(Arc::new(node)));
     let token = pair(&state, "app").await;
@@ -1104,6 +1111,120 @@ async fn add_invoke_auto_nonce_and_fee_when_omitted() {
     assert_eq!(tx["tip"], json!("0x0"));
 }
 
+/// A node whose balance and broadcast outcome a test chooses (#61).
+fn state_with_balance(balance: u128, refuse_add: Option<&str>) -> Arc<ServerState> {
+    let (_, root) = user_registry();
+    let node = MockNode {
+        nonce: Felt::from_hex("0x7").unwrap(),
+        hash: Felt::from_hex("0xabc").unwrap(),
+        deployed: vec![Felt::from_hex(&root).unwrap()],
+        all_deployed: false,
+        balance,
+        refuse_add: refuse_add.map(str::to_string),
+    };
+    Arc::new(
+        ServerState::new(Arc::new(Mutex::new(make_session(false))), Arc::new(AutoApprover(Decision::Approve)))
+            .with_node(ChainId::Sepolia, Arc::new(node)),
+    )
+}
+
+fn auto_fee_invoke(address: &str) -> Value {
+    json!({
+        "account_address": address,
+        "calls": [{ "contract_address": "0x49d36", "entry_point_selector": "transfer",
+                    "calldata": ["0xdead", "0x2710", "0x0"] }]
+    })
+}
+
+/// `Σ max_amount × max_price_per_unit` of a signed transaction's bounds.
+fn tx_max_fee(tx: &Value) -> u128 {
+    let n = |v: &Value| u128::from_str_radix(v.as_str().unwrap().trim_start_matches("0x"), 16).unwrap();
+    ["l1_gas", "l2_gas", "l1_data_gas"]
+        .iter()
+        .map(|k| n(&tx["resource_bounds"][k]["max_amount"]) * n(&tx["resource_bounds"][k]["max_price_per_unit"]))
+        .sum()
+}
+
+/// The mock's estimate bounds: 100×7 + 200000×11 + 100×3.
+const MOCK_MAX_FEE: u128 = 2_201_000;
+
+/// #61: a balance below the padded max fee but above the tightest bounds
+/// tightens the auto-estimated bounds to fit it.
+#[tokio::test]
+async fn auto_bounds_are_tightened_to_fit_the_balance() {
+    let (_, address) = user_registry();
+    let state = state_with_balance(2_150_000, None);
+    let token = pair(&state, "app").await;
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
+    let r = resp.result.expect("tightened bounds fit the balance");
+    let fee = tx_max_fee(&r["signed_transaction"]);
+    // The mock's unit prices are tiny, so the price can only step down to its floor.
+    assert!((2_000_000..=2_150_000).contains(&fee), "max fee {fee}");
+    // The amounts keep their margin; the price headroom gave way.
+    assert_eq!(r["signed_transaction"]["resource_bounds"]["l2_gas"]["max_amount"], json!("0x30d40"));
+
+    // With enough balance, the node's bounds are used as they are.
+    let state = state_with_balance(MOCK_MAX_FEE, None);
+    let token = pair(&state, "app").await;
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
+    assert_eq!(tx_max_fee(&resp.result.unwrap()["signed_transaction"]), MOCK_MAX_FEE);
+}
+
+/// #61: a balance below even the tightest bounds is refused before signing,
+/// with INSUFFICIENT_BALANCE_FOR_BOUNDS and the amounts in STRK; explicit
+/// resource_bounds are used as given.
+#[tokio::test]
+async fn a_balance_below_the_tightest_bounds_is_refused_with_a_reason() {
+    let (_, address) = user_registry();
+    let state = state_with_balance(1_000, None);
+    let token = pair(&state, "app").await;
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
+    assert_eq!(err_code(&resp), -32006);
+    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    let m = resp.error.unwrap().message;
+    for want in ["estimated fee", "padded max fee", "balance 0.000000 STRK"] {
+        assert!(m.contains(want), "message lacks the expected amounts");
+    }
+    // Caller-supplied bounds skip the balance fit.
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", invoke_params(&address)).await;
+    assert!(resp.result.is_some(), "explicit bounds are used as given");
+}
+
+/// #61: the node's code-55 "exceed balance" refusal on broadcast carries
+/// INSUFFICIENT_BALANCE_FOR_BOUNDS instead of a bare -32004.
+#[tokio::test]
+async fn the_nodes_exceed_balance_refusal_is_named() {
+    let (_, address) = user_registry();
+    let refusal = r#"{"code":55,"data":"Resources bounds (...) exceed balance (1922662352869740595).","message":"Account validation failed"}"#;
+    let state = state_with_balance(u128::MAX, Some(refusal));
+    let token = pair(&state, "app").await;
+    let mut p = auto_fee_invoke(&address);
+    p["submit"] = json!(true);
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p.clone()).await;
+    assert_eq!(err_code(&resp), -32006);
+    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    assert!(resp.error.unwrap().message.contains("balance 1.922662 STRK"));
+    // Any other broadcast failure stays a plain node error.
+    let state = state_with_balance(u128::MAX, Some(r#"{"code":55,"message":"Account validation failed"}"#));
+    let token = pair(&state, "app").await;
+    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p).await;
+    assert_eq!(err_code(&resp), -32004);
+    assert_eq!(reason(&resp), None);
+}
+
+/// #61: deploy-account fits its auto-estimated bounds to the new account's
+/// own balance.
+#[tokio::test]
+async fn deploy_account_bounds_fit_the_balance() {
+    let state = state_with_balance(1_000, None);
+    let agent = pair(&state, "agent").await;
+    let created = call(&state, Some(&agent), "companion_createAgentAccount", json!({"label": "bot"})).await;
+    assert!(created.result.is_some());
+    let resp = call(&state, Some(&agent), "companion_deployAccount", json!({ "submit": true })).await;
+    assert_eq!(err_code(&resp), -32006);
+    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+}
+
 #[tokio::test]
 async fn request_grant_approved_then_status_shows_active() {
     let state = state_with(Decision::Approve, false);
@@ -1250,6 +1371,7 @@ async fn node_can_be_set_and_cleared_at_runtime() {
             deployed: vec![],
             all_deployed: false,
             balance: 1_000_000_000_000_000_000,
+            refuse_add: None,
         })),
     );
     assert!(state.has_node_for(ChainId::Sepolia));
@@ -2869,6 +2991,10 @@ struct ProveNode {
     hold_nonce: std::sync::atomic::AtomicBool,
     nonce_reached: tokio::sync::Notify,
     nonce_release: tokio::sync::Notify,
+    /// The submitter's STRK balance (fri).
+    balance: std::sync::Mutex<u128>,
+    /// The bounds of each `add_invoke`.
+    bounds: std::sync::Mutex<Vec<FeeBounds>>,
 }
 
 /// `(sender, calldata, signature, proof)` of one `add_invoke`.
@@ -2930,10 +3056,11 @@ impl StarknetRpc for ProveNode {
         calldata: &[Felt],
         signature: &[Felt],
         _: &Felt,
-        _: &FeeBounds,
+        bounds: &FeeBounds,
         _: &[Felt],
         proof: Option<&str>,
     ) -> Result<Felt, NodeError> {
+        self.bounds.lock().unwrap().push(*bounds);
         self.added.lock().unwrap().push((*sender, calldata.to_vec(), signature.to_vec(), proof.map(str::to_string)));
         Ok(Felt::from_hex("0xabc").unwrap())
     }
@@ -2941,7 +3068,7 @@ impl StarknetRpc for ProveNode {
         Ok(true)
     }
     async fn balance_of(&self, _: &Felt, _: &Felt) -> Result<u128, NodeError> {
-        unimplemented!()
+        Ok(*self.balance.lock().unwrap())
     }
     async fn estimate_deploy_account(&self, _: &Felt, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
         unimplemented!()
@@ -2972,6 +3099,8 @@ fn prove_node_src5_until(src5_until: u64) -> Arc<ProveNode> {
         hold_nonce: Default::default(),
         nonce_reached: Default::default(),
         nonce_release: Default::default(),
+        balance: std::sync::Mutex::new(u128::MAX),
+        bounds: Default::default(),
     })
 }
 
@@ -3357,6 +3486,37 @@ async fn submit_account_prompts_and_submits_from_the_controller() {
     assert_eq!(signature.len(), 2);
     let payloads = f.prover.payloads.lock().unwrap().clone();
     assert_eq!(hexes(&payloads[0]["transaction"]["signature"]), vec![Felt::from(5u64)]);
+}
+
+/// #61: a `submit: "account"` batch fits its bounds to the submitter's
+/// balance, and a balance below the tightest bounds fails the job with
+/// INSUFFICIENT_BALANCE_FOR_BOUNDS before anything is broadcast.
+#[tokio::test]
+async fn submit_account_fits_the_bounds_to_the_submitters_balance() {
+    let f = prove_fixture("fit", prove_node(), &[]);
+    *f.node.balance.lock().unwrap() = 2_000_000;
+    let token = pair(&f.state, "app").await;
+    let plan_id = register_plan(&f, &token, true).await;
+    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" })).await;
+    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["status"], json!("succeeded"));
+    let bounds = f.node.bounds.lock().unwrap().clone();
+    assert_eq!(bounds.len(), 1);
+    let fee: u128 = [bounds[0].l1_gas, bounds[0].l2_gas, bounds[0].l1_data_gas]
+        .iter()
+        .map(|b| u128::from(b.max_amount) * b.max_price_per_unit)
+        .sum();
+    assert!(fee <= 2_000_000, "max fee {fee}");
+
+    let f = prove_fixture("broke", prove_node(), &[]);
+    *f.node.balance.lock().unwrap() = 1_000;
+    let token = pair(&f.state, "app").await;
+    let plan_id = register_plan(&f, &token, true).await;
+    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" })).await;
+    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    assert_eq!(job["status"], json!("failed"));
+    assert_eq!(job["error_reason"], json!("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    assert!(f.node.added.lock().unwrap().is_empty());
 }
 
 /// A refused submission prompt is 113 and keeps the plan.

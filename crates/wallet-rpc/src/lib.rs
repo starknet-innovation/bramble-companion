@@ -15,6 +15,7 @@ pub mod approval;
 pub mod auth;
 pub mod dispatch;
 pub mod error;
+pub mod fee;
 pub mod jsonrpc;
 pub mod log;
 pub mod node;
@@ -31,6 +32,7 @@ pub use approval::{
 pub use auth::{ClientInfo, ClientKind, ClientStore, PairedClient};
 pub use dispatch::{dispatch, ServerState};
 pub use error::WalletRpcError;
+pub use fee::{fit_bounds_to_balance, FeeEstimate, INSUFFICIENT_BALANCE_FOR_BOUNDS};
 pub use jsonrpc::{Request, Response, RpcErrorObject};
 pub use log::{now_unix_ms, LogEntry, RequestLog};
 pub use node::{

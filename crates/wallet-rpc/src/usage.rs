@@ -364,7 +364,7 @@ commitment comes with shadow-account invokes.",
         },
 
         "errors": {
-            "data.reason": "Some errors also carry error.data = { reason: \"UPPER_SNAKE\" }, a stable machine-readable reason (the message starts with it too). The code is unchanged; branch on data.reason when present. Current reasons: OWNER_NOT_DEPLOYED, OWNER_NO_CUSTOM_VALIDATION, OWNER_KEY_MISMATCH, OWNER_ALREADY_ENROLLED, ALREADY_REGISTERED, PLAN_LIMIT, PLAN_STALE, BLOCK_TOO_RECENT, BLOCK_BEFORE_PLAN, BLOCK_TOO_OLD, CHANNEL_NOT_FOUND (-32006); OWNER_NOT_ENROLLED (-32002); PLAN_NOT_FOUND, SIGNATURE_REQUIRED, SIGNATURE_NOT_ALLOWED, SELF_CHANNEL (114); DEPOSIT_UNSUPPORTED, RELAY_UNSUPPORTED (-32601); PLAN_HASH_MISMATCH (163). Failed proving jobs carry error_reason instead: OWNER_SIGNATURE_REJECTED, INVALID_SIGNATURE, PROVING_FAILED, WIPED_ON_LOCK.",
+            "data.reason": "Some errors also carry error.data = { reason: \"UPPER_SNAKE\" }, a stable machine-readable reason (the message starts with it too). The code is unchanged; branch on data.reason when present. Current reasons: OWNER_NOT_DEPLOYED, OWNER_NO_CUSTOM_VALIDATION, OWNER_KEY_MISMATCH, OWNER_ALREADY_ENROLLED, ALREADY_REGISTERED, PLAN_LIMIT, PLAN_STALE, BLOCK_TOO_RECENT, BLOCK_BEFORE_PLAN, BLOCK_TOO_OLD, CHANNEL_NOT_FOUND, INSUFFICIENT_BALANCE_FOR_BOUNDS (-32006); OWNER_NOT_ENROLLED (-32002); PLAN_NOT_FOUND, SIGNATURE_REQUIRED, SIGNATURE_NOT_ALLOWED, SELF_CHANNEL (114); DEPOSIT_UNSUPPORTED, RELAY_UNSUPPORTED (-32601); PLAN_HASH_MISMATCH (163). Failed proving jobs carry error_reason instead: OWNER_SIGNATURE_REJECTED, INVALID_SIGNATURE, PROVING_FAILED, WIPED_ON_LOCK.",
             "113": "USER_REFUSED — the user rejected the prompt (or it timed out after ~60s)",
             "114": "INVALID_REQUEST_PAYLOAD — malformed params / missing field",
             "116": "DEPLOYMENT_DATA_NOT_AVAILABLE — no in-scope account",
@@ -378,7 +378,7 @@ commitment comes with shadow-account invokes.",
             "-32003": "TRANSPORT_REJECTED — missing X-Companion-Client, non-loopback Host, or Origin present",
             "-32004": "NODE_ERROR — fee estimate / nonce / broadcast failed at the Starknet node",
             "-32005": "NO_NODE — broadcast/estimate needs a node; pass nonce + resource_bounds, or ask the user to set an RPC URL",
-            "-32006": "PRECONDITION_FAILED — the request is valid but on-chain state blocks it (e.g. the manager/funding-source account is not deployed on the active network, or the account is already deployed). The message names the account + the human fix. Surface it to the user.",
+            "-32006": "PRECONDITION_FAILED — the request is valid but on-chain state blocks it (e.g. the manager/funding-source account is not deployed on the active network, or the account is already deployed). The message names the account + the human fix. Surface it to the user. With data.reason INSUFFICIENT_BALANCE_FOR_BOUNDS: the paying account's STRK can't cover the fee bounds even after strkd tightened them toward the estimate (the message gives estimated fee, max fee and balance in STRK) — fund the account or pass explicit resource_bounds.",
             "-32601": "NOT_IMPLEMENTED — method not available in this build",
             "-32700": "PARSE_ERROR — body is not valid JSON"
         },
