@@ -117,7 +117,8 @@ impl StarknetRpc for PoolNode {
         Ok(true)
     }
     async fn balance_of(&self, _: &Felt, _: &Felt) -> Result<u128, NodeError> {
-        unimplemented!()
+        // The submitter's STRK, read to fit the fee bounds (#61).
+        Ok(u128::MAX)
     }
     async fn estimate_deploy_account(&self, _: &Felt, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
         unimplemented!()

@@ -1031,9 +1031,11 @@ async fn resolve_exec(
         None if proof_carrying.is_some_and(|(_, proof)| proof.is_some()) => {
             let (facts, proof) = proof_carrying.expect("checked");
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
-            node.estimate_invoke_with_proof(sender, encoded_calldata, &nonce, facts, proof.expect("checked"))
+            let padded = node
+                .estimate_invoke_with_proof(sender, encoded_calldata, &nonce, facts, proof.expect("checked"))
                 .await
-                .map_err(|e| WalletRpcError::Node(e.to_string()))?
+                .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            crate::fee::fit_bounds_to_balance(node.as_ref(), sender, padded, 0).await?
         }
         None if proof_carrying.is_some() => {
             return Err(WalletRpcError::InvalidRequest(
@@ -1045,9 +1047,13 @@ async fn resolve_exec(
         }
         None => {
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
-            node.estimate_invoke(sender, encoded_calldata, &nonce)
+            let padded = node
+                .estimate_invoke(sender, encoded_calldata, &nonce)
                 .await
-                .map_err(|e| WalletRpcError::Node(e.to_string()))?
+                .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            // Auto-estimated bounds are fitted to the payer's STRK balance
+            // (#61); caller-supplied bounds are used as given.
+            crate::fee::fit_bounds_to_balance(node.as_ref(), sender, padded, 0).await?
         }
     };
     Ok((nonce, bounds))
@@ -1110,7 +1116,7 @@ async fn sign_and_submit(
                 proof.as_deref(),
             )
             .await
-            .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            .map_err(|e| crate::fee::broadcast_error(e, &bounds))?;
         return Ok(json!({ "transaction_hash": felt_hex(&hash), "submitted": true }));
     }
 
@@ -1243,9 +1249,11 @@ async fn handle_add_declare(
                     "to estimate a declare, provide 'contract_class' (or pass resource_bounds)".into(),
                 )
             })?;
-            node.estimate_declare(&sender, &compiled_class_hash, cc, &nonce)
+            let padded = node
+                .estimate_declare(&sender, &compiled_class_hash, cc, &nonce)
                 .await
-                .map_err(|e| WalletRpcError::Node(e.to_string()))?
+                .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            crate::fee::fit_bounds_to_balance(node.as_ref(), &sender, padded, 0).await?
         }
     };
 
@@ -1288,7 +1296,7 @@ async fn handle_add_declare(
         let hash = node
             .add_declare(&sender, &compiled_class_hash, cc, &signed.signature, &nonce, &bounds)
             .await
-            .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            .map_err(|e| crate::fee::broadcast_error(e, &bounds))?;
         return Ok(json!({
             "transaction_hash": felt_hex(&hash),
             "class_hash": felt_hex(&class_hash),
@@ -2092,9 +2100,12 @@ async fn handle_deploy_account(
         Some(b) => b,
         None => {
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
-            node.estimate_deploy_account(&d.address, &d.class_hash, &d.constructor_calldata, &d.salt)
+            let padded = node
+                .estimate_deploy_account(&d.address, &d.class_hash, &d.constructor_calldata, &d.salt)
                 .await
-                .map_err(|e| WalletRpcError::Node(e.to_string()))?
+                .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            // The undeployed account pays its own deploy fee.
+            crate::fee::fit_bounds_to_balance(node.as_ref(), &d.address, padded, 0).await?
         }
     };
 
@@ -2139,7 +2150,7 @@ async fn handle_deploy_account(
                 &bounds,
             )
             .await
-            .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+            .map_err(|e| crate::fee::broadcast_error(e, &bounds))?;
         return Ok(json!({
             "transaction_hash": felt_hex(&hash),
             "contract_address": account.address,

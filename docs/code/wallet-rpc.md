@@ -23,6 +23,7 @@ It holds **no key material**: all signing goes through
 | `log.rs` | `RequestLog` — SQLite-backed (file or in-memory), with full-payload redaction toggle. |
 | `store.rs` | `VaultStore` — atomic on-disk `vault.bin` load/save (temp + rename, `0600`). |
 | `node.rs` | `StarknetRpc` trait + `HttpStarknetRpc` (reqwest JSON-RPC): nonce, fee estimate, broadcast, deploy-status, deploy-account. |
+| `fee.rs` | Fee bounds (#61): `FeeEstimate` → padded bounds (amount and price padded separately), `fit_bounds_to_balance` (tighten to the payer's STRK balance, or `INSUFFICIENT_BALANCE_FOR_BOUNDS`), `broadcast_error` (names the node's code-55 "exceed balance" refusal). |
 | `dispatch.rs` | `dispatch()` — transport-agnostic request routing, auth, scoping, approval, logging. |
 | `server.rs` | Loopback axum HTTP transport + `port.lock` discovery + transport hardening + `GET /` usage doc. |
 | `usage.rs` | Self-describing usage document served at `GET /` / `GET /usage`. |
@@ -134,7 +135,7 @@ node configured only for one chain is never reused on another. Attach at constru
 Settings panel registers both networks when the user saves). `has_node_for` /
 `node_for` read them (the clone is never held across an await). When present,
 `wallet_addInvokeTransaction` and `companion_requestFunding` auto-fetch the
-nonce, estimate the fee (with a 1.5× margin), and broadcast on `submit:true`.
+nonce, estimate the fee (see [Fee bounds](#fee-bounds)), and broadcast on `submit:true`.
 When absent, those calls are sign-only and require caller-supplied `nonce` +
 `resource_bounds` (else `-32005 NoNode`).
 
@@ -161,6 +162,50 @@ desktop `deploy_account` command applies the same already-deployed guard. The
 STRK20 handlers that prove check the account **is deployed at the proving block**
 (head − 12), so registering right after a deploy says to retry in about a minute
 instead of failing inside the prover ([`strk20.md`](./strk20.md)).
+
+### Fee bounds
+
+A V3 transaction pays `amount used × the block's price` per resource; its
+`resource_bounds` are maxima. The node refuses a transaction whose max fee
+(`Σ max_amount × max_price_per_unit`) exceeds the payer's STRK balance (code 55,
+"Resources bounds … exceed balance"). Up to 0.4.0 strkd padded both the amount
+and the price by 1.5×, so it asked for ~2.25× the estimate in balance (#61).
+`fee.rs` now pads them separately:
+
+| | headroom | why |
+|---|---|---|
+| gas amounts | 1.5× | estimates skip `__validate__`; running out of gas reverts *and is charged* |
+| L2 gas price | 1.2× | largest rise seen within 10 min: 0.7 % (mainnet) |
+| L1 gas price | 1.5× | 1.8 % within 10 min, but large swings over days; L1 gas is usually 0 |
+| L1 data gas price | 2× | 4.4 % within 10 min, 12× swings over days (mainnet), more on Sepolia; few units used |
+
+The price data (8 × 300 block headers per network, 2026-11-15) is in
+`fee.rs`'s module doc and the PR that fixed #61. For an L2-dominated fee the max fee is now
+~1.8× the estimate.
+
+**Balance fit.** Auto-estimated bounds (`wallet_addInvokeTransaction`,
+`companion_requestFunding`, `wallet_addDeclareTransaction`,
+`companion_deployAccount`, the desktop deploy, and every STRK20 submission from
+an account: `companion_strk20Register`, deposits via
+`wallet_strk20InvokeTransaction`, `companion_strk20Prove` `submit:"account"`)
+then go through `fit_bounds_to_balance`, which reads the payer's STRK balance
+(one `balanceOf`) before the prompt:
+
+- max fee ≤ balance → the padded bounds, unchanged;
+- otherwise the price headroom shrinks toward 1.05× first (a price bound that is
+  too low only keeps the tx out of a block), then the amount margin toward 1.1×,
+  to the largest bounds the balance covers;
+- if even 1.1× amounts at 1.05× prices exceed it → `-32006` with
+  `data.reason: INSUFFICIENT_BALANCE_FOR_BOUNDS` and a message giving the
+  estimated fee, padded max fee, tightest max fee and balance in STRK.
+
+STRK20 submissions subtract the STRK the batch itself pulls (pool fee, STRK
+deposits) from the balance first. Caller-supplied `resource_bounds` are used as
+given (no read), and `companion_estimateFee` returns the padded bounds without a
+balance read. A failed balance read keeps the padded bounds. If the node still
+refuses a broadcast with "exceed balance", `broadcast_error` turns it into the
+same `-32006` + `INSUFFICIENT_BALANCE_FOR_BOUNDS` (max fee and balance in STRK)
+instead of a bare `-32004`.
 
 **Wire format — live-verified (2026-06-09)** against a Sepolia **v0.10** node
 (`sepolia.nodes.starknet.org/rpc/v0_10`) using the real client: `getNonce`,

@@ -51,8 +51,9 @@ pub trait StarknetRpc: Send + Sync {
     /// Current nonce of `address` (pending block).
     async fn get_nonce(&self, address: &Felt) -> Result<Felt, NodeError>;
 
-    /// Estimate fee for a V3 invoke and return resource bounds (safety margin
-    /// already applied). Estimation uses SKIP_VALIDATE, so no signature needed.
+    /// Estimate fee for a V3 invoke and return resource bounds (headroom
+    /// already applied, see [`crate::fee::FeeEstimate::bounds`]). Estimation
+    /// uses SKIP_VALIDATE, so no signature needed.
     async fn estimate_invoke(
         &self,
         sender: &Felt,
@@ -219,8 +220,6 @@ pub struct HttpStarknetRpc {
     /// redirect target (reqwest would turn a 301 POST into a GET) and cache it.
     url: std::sync::RwLock<String>,
     client: reqwest::Client,
-    /// Multiply estimated amounts/prices by this (×100, integer) for headroom.
-    margin_pct: u128,
 }
 
 impl HttpStarknetRpc {
@@ -234,7 +233,6 @@ impl HttpStarknetRpc {
         HttpStarknetRpc {
             url: std::sync::RwLock::new(url.into()),
             client,
-            margin_pct: 150, // 1.5×
         }
     }
 
@@ -295,10 +293,6 @@ impl HttpStarknetRpc {
         u128::from_str_radix(s, 16).map_err(|_| NodeError::Decode(format!("{what}: bad u128")))
     }
 
-    fn with_margin(&self, v: u128) -> u128 {
-        v.saturating_mul(self.margin_pct) / 100
-    }
-
 
     /// DEPLOY_ACCOUNT v3 tx JSON shared by estimate (empty sig, zero bounds) and
     /// broadcast (real sig + bounds). Nonce is always 0.
@@ -335,18 +329,10 @@ impl HttpStarknetRpc {
         })
     }
 
+    /// Padded bounds from a `FEE_ESTIMATE`: amounts and prices get separate
+    /// headroom (see [`crate::fee`], #61).
     fn bounds_from_estimate(&self, est: &Value) -> Result<FeeBounds, NodeError> {
-        let bound = |amount_key: &str, price_key: &str| -> Result<ResourceBounds, NodeError> {
-            Ok(ResourceBounds {
-                max_amount: self.with_margin(Self::parse_u128(&est[amount_key], amount_key)?) as u64,
-                max_price_per_unit: self.with_margin(Self::parse_u128(&est[price_key], price_key)?),
-            })
-        };
-        Ok(FeeBounds {
-            l1_gas: bound("l1_gas_consumed", "l1_gas_price")?,
-            l2_gas: bound("l2_gas_consumed", "l2_gas_price")?,
-            l1_data_gas: bound("l1_data_gas_consumed", "l1_data_gas_price")?,
-        })
+        Ok(crate::fee::FeeEstimate::from_rpc(est)?.bounds())
     }
 }
 
@@ -390,7 +376,7 @@ impl StarknetRpc for HttpStarknetRpc {
         let est = r
             .get(0)
             .ok_or_else(|| NodeError::Decode("empty estimate array".into()))?;
-        // Spec 0.8 FEE_ESTIMATE fields. Amounts/prices get a safety margin.
+        // Spec 0.8 FEE_ESTIMATE fields. Amounts and prices get separate headroom.
         self.bounds_from_estimate(est)
     }
 

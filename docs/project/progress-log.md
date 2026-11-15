@@ -8,6 +8,71 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-15 — Fee bounds pad amount and price separately; fit to balance (#61)
+
+**Did**
+- Added `crates/wallet-rpc/src/fee.rs`:
+  - `FeeEstimate` parses a `FEE_ESTIMATE` and pads it: amounts 1.5×, prices
+    1.5× (L1 gas), 1.2× (L2 gas), 2× (L1 data gas). Amounts saturate into the
+    u64 `max_amount` instead of truncating with `as u64`.
+  - `fit_bounds_to_balance` reads the payer's STRK balance once. It keeps the
+    padded bounds when they fit; otherwise it shrinks the price headroom toward
+    1.05×, then the amount margin toward 1.1×. Below that it fails with `-32006`
+    and `data.reason: INSUFFICIENT_BALANCE_FOR_BOUNDS`, with the estimated fee,
+    padded max fee, tightest max fee and balance in STRK.
+  - `broadcast_error` maps the node's code-55 "exceed balance" refusal to the
+    same reason (max fee and balance in STRK).
+- `HttpStarknetRpc::bounds_from_estimate` uses `FeeEstimate`. The `margin_pct`
+  field and `with_margin` are gone.
+- Wired the balance fit into every auto-estimated submission:
+  - `resolve_exec` (wallet_addInvokeTransaction, with or without a proof;
+    companion_requestFunding);
+  - wallet_addDeclareTransaction and companion_deployAccount;
+  - the desktop `deploy_account` command;
+  - STRK20 `submit_from` (companion_strk20Register, deposits via
+    wallet_strk20InvokeTransaction, companion_strk20Prove `submit:"account"`).
+    It subtracts the STRK the batch pulls (pool fee, STRK deposits) first.
+- Mapped broadcast errors through `broadcast_error` (invoke, declare,
+  deploy_account, STRK20 submit, desktop deploy).
+- Tests: 10 unit tests in `fee.rs`; dispatch tests for tightening, the
+  insufficient-balance reason, code-55 mapping, deploy-account and STRK20
+  `submit:"account"` (tightened and refused).
+- Docs: `wallet-rpc.md` (Fee bounds section), `strk20.md` (Fees), `usage.rs`
+  (-32006 reason).
+
+**Decisions**
+- Price headroom comes from block headers: 8 windows of 300 blocks per network,
+  2026-11-15. Over 20 blocks (~40 s) the largest price rise was 1.0 % (mainnet
+  L1 data gas). Over 299 blocks (~10 min, a slow approval) it was 4.4 % (mainnet
+  L1 data gas), 1.8 % (L1 gas) and 0.7 % (L2 gas). Between windows, L1 prices
+  moved a lot (mainnet L1 data gas 12×). L2 gas dominates fees, so it gets 1.2×.
+  The L1 resources keep wide headroom because they cost little in balance.
+- The amount margin stays at 1.5×: estimates skip `__validate__`, and running out
+  of gas is charged. Prices give way first when tightening, because a price bound
+  that is too low only keeps the tx out of a block.
+- Caller-supplied `resource_bounds` are never tightened and trigger no balance
+  read. `companion_estimateFee` returns padded bounds without a read. A failed
+  balance read keeps the padded bounds, and the node's own check still applies.
+- Suggestion 3 of #61 (caller `resource_bounds` on STRK20 submissions) was left
+  out. The `companion_strk20Prove` prompt only appears when the route changed
+  (design #48 §5.6), and STRK20 prompts come before the fee is known. Showing
+  caller bounds there means reworking those prompts, which is out of scope here.
+
+**Verify**
+- `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings`
+  at the workspace root: green.
+- Live, read-only (Sepolia, test account 0, 1-fri STRK self-transfer):
+  estimate 0.033885 STRK. The old max fee was 0.076242 STRK (2.25×); the new one
+  is 0.061829 STRK (1.83×).
+
+**Next / Resume**
+- Optional: caller `resource_bounds` on STRK20 submissions (#61 suggestion 3).
+
+**Notes / caveats**
+- The issue's 2.29 STRK STRK20 estimate now pads to ~4.1 STRK and tightens to
+  ~2.65 STRK at least. An account with 1.92 STRK still can't submit it, but it now
+  gets INSUFFICIENT_BALANCE_FOR_BOUNDS with the amounts instead of a bare -32004.
+
 ## 2026-11-13 — STRK20 #49: note locators and companion_strk20ChannelKey
 
 **Did**
