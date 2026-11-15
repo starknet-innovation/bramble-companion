@@ -747,3 +747,47 @@ An independent review of `981c83e` found the items below; all are fixed on
   (`prove_unrecorded`, `enqueue_prove_unrecorded`). The `signature` field must still be an array,
   so the prover still never signs. `companion_prove` (recorded jobs) keeps requiring a non-empty
   signature.
+
+### 11.4 Owner batches that open several channels (#64)
+
+Added after phase 1. Where this section differs from §5.6, §6 or §7, this section wins.
+
+- **Problem.** The planner flags `UserLinkage` when a batch opens more than one channel, and
+  `plan_at_reference` turned it into `PRIVACY_LEAK` (120) for every subject. An owner contract that
+  must pay several new recipients atomically (an escrow settling two parties, say) could not do it
+  in one batch: after the first payout its state no longer allows the second.
+- **Decision.** Option 1 of the issue: `companion_strk20Plan` takes `allow_linkage?: bool` (default
+  false), accepted only for `subject: "owner"`.
+  - An account with `allow_linkage: true` gets 114 `LINKAGE_OWNERS_ONLY`, whatever the batch.
+    Without it, accounts keep the 120 refusal and its message, unchanged.
+  - An owner without the flag also keeps the 120 refusal. Its message names `allow_linkage` as the
+    opt-in.
+  - Only the plan method has the flag. The one-shot methods refuse owners until phase 2 and always
+    refuse linkage (`Linkage::Refuse`).
+  - Option 2 (owners skip the check by default) was not chosen: it hides a privacy cost behind a
+    default. Option 3 (an enrolment-time flag) was not chosen: the linkage depends on each batch's
+    recipients, which enrolment can't know.
+- **Disclosure.** When the flag lets through a batch that opens more than one channel, the plan
+  prompt adds: "PUBLIC LINKAGE (allow_linkage): this batch opens N new channels in one transaction,
+  to `<recipients>`. Anyone watching the pool can see that these recipients each got a new channel
+  from the same sender, which publicly links them to each other as counterparties of one sender.
+  That link is new public information and is permanent once the batch lands. The owner contract's
+  on-chain approval of this plan can also tie them to this owner, by timing." The owner itself is
+  marked if its self-channel is among them. The issue's argument that the linkage is "already
+  public" does not hold for the recipient-to-recipient link, so the prompt does not say so.
+- **Prompt choice.** That plan prompt goes through `Caller::approve_always`: a grant never covers
+  it, as for `reveal_actions` and enrolment (D6). A grant is consent to routine plans; it should
+  not let an agent add a permanent, public privacy cost the user never saw. With the flag but at
+  most one new channel, the prompt and grant behaviour are unchanged.
+- **Result.** `summary.channels_opened` (always) and `summary.linkage_allowed` (true only when the
+  flag let through a batch that opens several channels). Both reach the request log with the
+  result.
+- **Other checks.** The flag only skips the `UserLinkage` refusal. Registration, staleness, SRC5,
+  deployment, scope, caps and the plan hash are unchanged. Prove never re-plans, so it accepts such
+  a plan; when it prompts, it quotes the plan prompt, disclosure included.
+- **Pool check.** At pool commit `4026da7` (the deployed class), `open_channel` asserts only that
+  the sender's outgoing channel `index − 1` exists, and `main` applies each action's writes before
+  the next action (`_client_apply_actions`). The second channel of a batch, at the next index,
+  passes. Each channel appends to a different recipient's channel list and writes its own marker
+  and outgoing slot, so nothing collides. The SDK's compiler only warns (`USER_LINKAGE`); it does
+  not refuse.

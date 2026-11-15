@@ -48,7 +48,8 @@ STRK20`. The local screener applies to the one-shot deposit methods only;
    (`strk20::discovery`), so no indexer sees `user_sk`.
 2. **Plan** (`strk20::planner`): indices, note selection (largest first),
    change, the self-channel on register, phase order. A batch opening more than
-   one channel is refused (`PRIVACY_LEAK`, 120).
+   one channel is refused (`PRIVACY_LEAK`, 120). The only exception is an
+   owner's `companion_strk20Plan { allow_linkage: true }` (#64, below).
 3. **Approve**: one prompt naming the actions, who proves, and how it is
    submitted. The desktop user's click is the consent.
 4. **Sign** the virtual invoke: sender = pool, calldata
@@ -190,7 +191,7 @@ All three parts of phase 1 are built (enrolment, the plan step, the prove step):
   `account_address` is a 114. The existing `wallet_strk20*` and
   `companion_strk20Register` methods refuse owners with `-32601` for now.
 - **Plan (part 2).** `companion_strk20Plan { owner_address | account_address,
-  register? | actions?, reveal_actions?, ttl_secs?, chainId? }` runs the first
+  register? | actions?, reveal_actions?, allow_linkage?, ttl_secs?, chainId? }` runs the first
   half of the one-shot pipeline and stops before signing:
   1. Refuses deposits (`DEPOSIT_UNSUPPORTED`, `-32601`), checks the plan caps,
      and for `register: true` refuses an already registered subject
@@ -199,14 +200,37 @@ All three parts of phase 1 are built (enrolment, the plan step, the prove step):
      subject is deployed at `B` (`OWNER_NOT_DEPLOYED` for an owner), an owner
      still advertises SRC5 at `B` (`OWNER_NO_CUSTOM_VALIDATION`), discovery at
      `B` and at `latest` must agree, then `planner::plan` with `OsRandomness`
-     drawn once, and the `UserLinkage` check.
-  3. `plan_hash` (below), one gated prompt (a grant covers it) naming the
+     drawn once, and the `UserLinkage` check (see `allow_linkage` below).
+  3. `plan_hash` (below), one gated prompt (a grant covers it, except under
+     `allow_linkage`) naming the
      subject, the controller, the chain, the intent, the action count, the pool
      and, for an owner, that its contract must approve the plan on-chain first.
   4. Stores the plan and returns `plan_id`, `plan_version: 1`, `expires_at`
      (Unix ms), `plan_block`, `plan_hash`, `actions_hash`, `typed_data` and a
      summary (transfers, withdrawals, action count, notes spent, change, pool
-     fee). Nothing is signed and nothing is proved.
+     fee, `channels_opened`, `linkage_allowed`). Nothing is signed and nothing
+     is proved.
+- **`allow_linkage` (#64).** A batch that opens more than one channel shows
+  the pool that its new channels' recipients share a sender, so
+  `plan_at_reference` refuses it (`PRIVACY_LEAK`, 120) unless it is given
+  `Linkage::Allow`. Only `companion_strk20Plan { allow_linkage: true }` for an
+  owner subject passes that; the one-shot methods always refuse, and an
+  account with the flag gets 114 `LINKAGE_OWNERS_ONLY` before any node read
+  or prompt, whatever the batch. An
+  owner refused without the flag is told about `allow_linkage`; the account
+  message is unchanged. When the flag lets such a batch through, the plan
+  prompt adds a `PUBLIC LINKAGE` disclosure (`plan::linkage_disclosure`): the
+  number of new channels, every recipient, that they become publicly linked
+  to each other as counterparties of one sender (new, permanent
+  information), and that the owner's on-chain approval can tie them to the
+  owner by timing. That prompt goes through `Caller::approve_always`, so a
+  grant never hides it, and the summary has `linkage_allowed: true`. With the
+  flag but only one new channel, nothing changes. No other check depends on
+  the flag. Prove never re-plans, so it accepts the plan as approved (its
+  prompt, when shown, quotes the plan prompt and so the disclosure). The
+  pool allows several `open_channel`s in one batch: it only asserts that
+  index − 1 exists, and `main` applies each action's writes before the next
+  (pool source at `4026da7`), so the planner's consecutive indices are valid.
 - **`plan_hash`.** `actions_hash = poseidon_hash_many(serialize_actions(actions))`,
   which is `compile_actions` calldata from index 2 on (the `Span` length prefix
   included; `owner` and `user_sk` excluded). The typed data is

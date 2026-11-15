@@ -618,4 +618,114 @@ mod tests {
             vec![Warning::UserLinkage]
         );
     }
+
+    /// #64: a batch paying two recipients who both need a new channel is still
+    /// a valid batch. The pool's `open_channel` only asserts that index − 1
+    /// exists, and `main` applies each action's writes before the next, so the
+    /// two channels take consecutive indices after the existing ones; each
+    /// gets its own subchannel at index 0 and a first note at index 0. The
+    /// warning is set; refusing or allowing it is the caller's decision.
+    #[test]
+    fn two_new_recipients_get_consecutive_channels_and_valid_actions() {
+        const CAROL: u64 = 0xca201;
+        let st = state(
+            true,
+            vec![
+                channel(USER, true, &[(STRK, 0, 1)]),
+                channel(BOB, false, &[]),
+                channel(CAROL, false, &[]),
+            ],
+            vec![note(50, 0)],
+        );
+        let intent = Intent {
+            transfers: vec![
+                (Felt::from(BOB), Felt::from(STRK), 20),
+                (Felt::from(CAROL), Felt::from(STRK), 5),
+            ],
+            ..Intent::default()
+        };
+        let p = plan(&intent, &st, &mut Counter(1)).unwrap();
+        assert_eq!(p.warnings, vec![Warning::UserLinkage]);
+        assert!(p.actions.windows(2).all(|w| w[0].phase() <= w[1].phase()));
+
+        // Two channels, at the user's next indices (the self-channel is 0).
+        let opened: Vec<(Felt, u32)> = p
+            .actions
+            .iter()
+            .filter_map(|a| match a {
+                ClientAction::OpenChannel {
+                    recipient_addr,
+                    index,
+                    random,
+                    salt,
+                } => {
+                    assert!(*random != Felt::ZERO && *salt != Felt::ZERO);
+                    Some((*recipient_addr, *index))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(opened, vec![(Felt::from(BOB), 1), (Felt::from(CAROL), 2)]);
+
+        // One STRK subchannel per recipient, under its own channel key.
+        let subs: Vec<(Felt, Felt, u32)> = p
+            .actions
+            .iter()
+            .filter_map(|a| match a {
+                ClientAction::OpenSubchannel {
+                    recipient_addr,
+                    channel_key,
+                    index,
+                    token,
+                    ..
+                } => {
+                    assert_eq!(*token, Felt::from(STRK));
+                    Some((*recipient_addr, *channel_key, *index))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            subs,
+            vec![
+                (Felt::from(BOB), Felt::from(BOB + 2), 0),
+                (Felt::from(CAROL), Felt::from(CAROL + 2), 0)
+            ]
+        );
+
+        // Notes: each recipient's first, then the change on the self subchannel.
+        let notes: Vec<(Felt, u128, u32, u128)> = p
+            .actions
+            .iter()
+            .filter_map(|a| match a {
+                ClientAction::CreateEncNote {
+                    recipient_addr,
+                    amount,
+                    index,
+                    salt,
+                    ..
+                } => Some((*recipient_addr, *amount, *index, *salt)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            notes.iter().map(|n| (n.0, n.1, n.2)).collect::<Vec<_>>(),
+            vec![
+                (Felt::from(BOB), 20, 0),
+                (Felt::from(CAROL), 5, 0),
+                (Felt::from(USER), 25, 1)
+            ]
+        );
+        assert!(notes.iter().all(|n| n.3 > crypto::OPEN_NOTE_SALT));
+
+        // Balance: the 50 note spent covers 20 + 5 + 25 change.
+        assert_eq!(p.spent, vec![Felt::from(1000u64)]);
+        assert_eq!(p.change.get(&Felt::from(STRK)), Some(&25));
+        // Both transfers are located on their own channels.
+        assert_eq!(p.notes.len(), 2);
+        assert_eq!(
+            p.notes[1].note_id,
+            hashes::note_id(Felt::from(CAROL + 2), Felt::from(STRK), 0)
+        );
+    }
 }
