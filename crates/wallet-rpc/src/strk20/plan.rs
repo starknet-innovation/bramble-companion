@@ -19,13 +19,13 @@ use serde_json::{json, Value};
 use strk20::actions::{serialize_actions, ClientAction};
 use strk20::discovery;
 use strk20::hashes::poseidon_hash_many;
-use strk20::planner::{Intent, NoteLocator, State};
+use strk20::planner::{Intent, NoteLocator, State, Warning};
 use wallet_core::{address_hex, AccountRef, ChainId, Felt};
 
 use super::{
-    ctx, describe, has_deposit, hex, intent_of, invalid, map_strk20, notes_json, parse_actions,
-    plan_at_reference, pool_fee, prover_identity, where_proved, Caller, Ctx, Planned, Proving,
-    Subject, STRK,
+    ctx, describe, has_deposit, hex, intent_of, invalid, map_strk20, notes_json, opened_channels,
+    parse_actions, plan_at_reference, pool_fee, prover_identity, where_proved, Caller, Ctx,
+    Linkage, Planned, Proving, Subject, STRK,
 };
 use crate::dispatch::{chain_name, param_str, prover_or_err, ServerState};
 use crate::error::WalletRpcError;
@@ -498,13 +498,44 @@ pub(super) fn subject_text(ctx: &Ctx) -> String {
     }
 }
 
+/// The plan prompt's disclosure for a batch planned with `allow_linkage` that
+/// opens more than one channel (#64). `linked` lists the recipients of the
+/// channels it opens.
+fn linkage_disclosure(ctx: &Ctx, linked: &[Felt]) -> String {
+    let names: Vec<String> = linked
+        .iter()
+        .map(|r| {
+            if *r == ctx.user {
+                format!("{} (this owner itself)", address_hex(r))
+            } else {
+                address_hex(r)
+            }
+        })
+        .collect();
+    format!(
+        "PUBLIC LINKAGE (allow_linkage): this batch opens {} new channels in one transaction, to {}. Anyone \
+         watching the pool can see that these recipients each got a new channel from the same sender, which \
+         publicly links them to each other as counterparties of one sender. That link is new public information \
+         and is permanent once the batch lands. The owner contract's on-chain approval of this plan can also tie \
+         them to this owner, by timing.",
+        linked.len(),
+        names.join(", "),
+    )
+}
+
 fn plan_prompt(
     ctx: &Ctx,
     intent: &Intent,
     n_actions: usize,
     plan_hash: &Felt,
     where_proved: &str,
+    linked: &[Felt],
 ) -> String {
+    let linkage = if linked.len() > 1 {
+        format!(" {}", linkage_disclosure(ctx, linked))
+    } else {
+        String::new()
+    };
     let next = match ctx.subject {
         Subject::Owner(_) => format!(
             "Nothing is signed or proved now. Before the proof can be built, the owner contract must approve this \
@@ -518,7 +549,7 @@ fn plan_prompt(
         ),
     };
     format!(
-        "STRK20 plan on {} for {}: {}. {n_actions} action(s), {}. {next}",
+        "STRK20 plan on {} for {}: {}. {n_actions} action(s), {}.{linkage} {next}",
         chain_name(ctx.chain),
         subject_text(ctx),
         describe(intent),
@@ -543,6 +574,7 @@ fn summary_json(
     plan: &strk20::planner::Plan,
     pool: &Felt,
     pool_fee: u128,
+    linkage_allowed: bool,
 ) -> Value {
     let moves = |list: &[(Felt, Felt, u128)]| {
         list.iter()
@@ -561,14 +593,27 @@ fn summary_json(
         // Charged by the pool on apply_actions, in STRK, to whoever submits it.
         "pool_fee": amount(pool_fee),
         "pool_fee_token": STRK,
+        // #64: channels this batch opens, and whether it opens more than one
+        // because the caller passed allow_linkage (owners only).
+        "channels_opened": opened_channels(plan).len(),
+        "linkage_allowed": linkage_allowed,
     })
 }
 
+/// `LINKAGE_OWNERS_ONLY` (114): `allow_linkage` on an account's plan.
+fn linkage_owners_only() -> WalletRpcError {
+    invalid(
+        "allow_linkage is accepted only for an owner contract (owner_address). A strkd account's batch may open \
+         at most one new channel: send to one new recipient per batch.",
+    )
+    .with_reason("LINKAGE_OWNERS_ONLY")
+}
+
 /// `companion_strk20Plan { owner_address | account_address, actions?, register?,
-/// reveal_actions?, ttl_secs?, chainId? }` → `{ plan_id, plan_version,
-/// expires_at, plan_block, chain_id, pool, owner, subject, controller,
-/// plan_hash, actions_hash, typed_data, summary, notes, actions_revealed?,
-/// client_actions?, client_actions_felts? }`.
+/// reveal_actions?, allow_linkage?, ttl_secs?, chainId? }` → `{ plan_id,
+/// plan_version, expires_at, plan_block, chain_id, pool, owner, subject,
+/// controller, plan_hash, actions_hash, typed_data, summary, notes,
+/// actions_revealed?, client_actions?, client_actions_felts? }`.
 ///
 /// `notes` locates each transfer note the plan creates (#49). It holds no
 /// channel key, so it is returned without `reveal_actions`.
@@ -577,12 +622,18 @@ fn summary_json(
 /// (a grant may cover it), and stores the plan. Signs nothing, proves nothing.
 /// `reveal_actions: true` adds a second prompt that a grant never covers; if
 /// refused, the plan still comes back, without the actions.
+///
+/// `allow_linkage: true` (owners only, #64) lets the batch open more than one
+/// channel. When it does, the prompt lists the recipients it links publicly
+/// and goes through `Caller::approve_always`, so a grant never hides it, and
+/// `summary.linkage_allowed` is true.
 pub async fn plan(
     state: &ServerState,
     caller: Caller<'_>,
     params: &Value,
 ) -> Result<Value, WalletRpcError> {
     let reveal = flag(params, "reveal_actions")?;
+    let allow_linkage = flag(params, "allow_linkage")?;
     let register = flag(params, "register")?;
     let ttl = ttl_secs(params)?;
     let intent = if register {
@@ -609,6 +660,11 @@ pub async fn plan(
         intent_of(&actions)
     };
     let ctx = ctx(state, caller, params).await?;
+    let linkage = match (&ctx.subject, allow_linkage) {
+        (_, false) => Linkage::Refuse,
+        (Subject::Owner(_), true) => Linkage::Allow,
+        (Subject::Account, true) => return Err(linkage_owners_only()),
+    };
     let prover = prover_or_err(state)?;
     let client = client_id(caller);
     state.session.lock().await.strk20_plans()?.check_caps(
@@ -636,8 +692,15 @@ pub async fn plan(
         state: mut snapshot,
         plan,
         ..
-    } = plan_at_reference(state, &ctx, &intent).await?;
+    } = plan_at_reference(state, &ctx, &intent, linkage).await?;
     snapshot.user_sk = Felt::ZERO;
+    // The recipients this batch links publicly: only set when allow_linkage
+    // let through a batch that opens more than one channel.
+    let linked = if plan.warnings.contains(&Warning::UserLinkage) {
+        opened_channels(&plan)
+    } else {
+        Vec::new()
+    };
     let felts = serialize_actions(&plan.actions);
     let hashed = plan_hash(ctx.chain, &ctx.pool, &ctx.user, &felts)?;
     let fee = pool_fee(&ctx).await?;
@@ -648,9 +711,16 @@ pub async fn plan(
         plan.actions.len(),
         &hashed.plan_hash,
         &where_proved,
+        &linked,
     );
 
-    caller.approve(state, METHOD, prompt.clone()).await?;
+    if linked.is_empty() {
+        caller.approve(state, METHOD, prompt.clone()).await?;
+    } else {
+        // A grant never covers a plan that links recipients: the user always
+        // sees which ones (#64).
+        caller.approve_always(state, METHOD, prompt.clone()).await?;
+    }
 
     let id = new_plan_id()?;
     let created_at_ms = now_unix_ms();
@@ -669,7 +739,7 @@ pub async fn plan(
         "plan_hash": hex(&hashed.plan_hash),
         "actions_hash": hex(&hashed.actions_hash),
         "typed_data": hashed.typed_data,
-        "summary": summary_json(&intent, &plan, &ctx.pool, fee),
+        "summary": summary_json(&intent, &plan, &ctx.pool, fee, !linked.is_empty()),
         "notes": notes_json(&plan.notes),
     });
     let stored = StoredPlan {

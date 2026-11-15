@@ -1,5 +1,6 @@
 //! STRK20 note disclosure (#49): `notes` locators on the batch methods, and
-//! `companion_strk20ChannelKey`.
+//! `companion_strk20ChannelKey`. Also the linkage disclosure of
+//! `companion_strk20Plan { allow_linkage }` (#64).
 //!
 //! Dispatch-level, against an in-memory pool whose storage is built with the
 //! pool's own hashes and encryptions (`strk20::hashes`, `strk20::crypto`), so
@@ -975,4 +976,231 @@ async fn pool_address_only_confirms_the_configured_pool() {
     )
     .await;
     assert!(r.error.is_none(), "code {}", code(&r));
+}
+
+// ── allow_linkage (#64) ──────────────────────────────────────────────────────
+
+/// A registered recipient nobody has sent to, besides carol.
+fn dave() -> Felt {
+    Felt::from(0xda7e_u64)
+}
+
+/// Two transfers to recipients the subject has no channel to.
+fn two_new_recipients(a: Felt, b: Felt) -> Value {
+    json!([
+        { "type": "transfer", "token": STRK, "amount": "0x3", "recipient": format!("{a:#x}") },
+        { "type": "transfer", "token": STRK, "amount": "0x4", "recipient": format!("{b:#x}") },
+    ])
+}
+
+/// `funded_pool`, plus the owner at [`OWNER`]: registered under the key its
+/// controller derives, advertising SRC5, 100 STRK on its self-channel and no
+/// channel to bob or carol. Enrolled by a fresh `app` client; returns the
+/// fixture and that client's `(token, id)`.
+async fn owner_fixture(tag: &str, reject: &'static [&'static str]) -> (Fixture, String, String) {
+    let (node, _) = funded_pool();
+    let osk = owner_sk();
+    let opk = crypto::public_key(osk);
+    node.register(owner(), opk);
+    node.advertise_custom_validation();
+    node.open_channel(owner(), osk, owner(), opk, &[(strk(), &[100])]);
+    let f = fixture(tag, node, reject);
+    let (token, id) = pair(&f.state, "app").await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
+    assert!(r.error.is_none(), "enrol: code {}", code(&r));
+    (f, token, id)
+}
+
+fn message(r: &Response) -> String {
+    r.error
+        .as_ref()
+        .map(|e| e.message.clone())
+        .unwrap_or_default()
+}
+
+/// An owner's batch to two new recipients plans with `allow_linkage`. The plan
+/// prompt is shown even under a grant and lists both recipients; the summary
+/// records the linkage; prove accepts the plan (it never re-checks linkage).
+#[tokio::test]
+async fn an_owner_plan_with_allow_linkage_always_prompts_and_proves() {
+    let (f, token, id) = owner_fixture("link-owner", &[]).await;
+    grant_forever(&f.state, &id).await;
+
+    let p = ok(call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "actions": two_new_recipients(bob(), carol()), "allow_linkage": true }),
+    )
+    .await);
+    assert_eq!(p["subject"], json!("owner"));
+    assert_eq!(p["summary"]["linkage_allowed"], json!(true));
+    assert_eq!(p["summary"]["channels_opened"], json!(2));
+    assert_eq!(p["notes"].as_array().map(Vec::len), Some(2));
+
+    // Shown despite the grant, naming both recipients and the linkage.
+    let prompts = f.approver.prompts(PLAN);
+    assert_eq!(prompts.len(), 1, "one plan prompt under a grant");
+    let prompt = &prompts[0];
+    for (i, r) in [bob(), carol()].into_iter().enumerate() {
+        assert!(
+            prompt.contains(&address_hex(&r)),
+            "recipient #{i} missing from the prompt"
+        );
+    }
+    for (i, phrase) in [
+        "PUBLIC LINKAGE",
+        "2 new channels in one transaction",
+        "publicly links them to each other",
+        "new public information",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(prompt.contains(phrase), "disclosure phrase #{i} missing");
+    }
+    assert!(
+        !prompt.contains("already public"),
+        "the prompt calls the linkage already public"
+    );
+
+    // Prove takes the plan as approved: no linkage re-check.
+    let job = ok(call(
+        &f.state,
+        Some(&token),
+        "companion_strk20Prove",
+        json!({ "plan_id": p["plan_id"], "signature": [] }),
+    )
+    .await);
+    let job_id = job["job_id"].as_str().unwrap().to_string();
+    let mut status = Value::Null;
+    for _ in 0..500 {
+        let s = ok(call(
+            &f.state,
+            Some(&token),
+            "companion_proveStatus",
+            json!({ "job_id": job_id }),
+        )
+        .await);
+        if s["status"] == json!("succeeded") || s["status"] == json!("failed") {
+            status = s["status"].clone();
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    assert_eq!(status, json!("succeeded"));
+}
+
+/// Refusing the linkage prompt is a 113 and stores nothing: the same plan can
+/// be asked for again (no `PLAN_LIMIT`).
+#[tokio::test]
+async fn refusing_a_linkage_plan_stores_nothing() {
+    let (f, token, _) = owner_fixture("link-refuse", &[PLAN]).await;
+    let params = json!({ "owner_address": OWNER, "actions": two_new_recipients(bob(), carol()), "allow_linkage": true });
+    for _ in 0..2 {
+        let r = call(&f.state, Some(&token), PLAN, params.clone()).await;
+        assert_eq!(code(&r), 113);
+    }
+    assert_eq!(f.approver.prompts(PLAN).len(), 2);
+}
+
+/// Without the flag, an owner keeps today's refusal, now pointing at
+/// `allow_linkage`; nothing is prompted.
+#[tokio::test]
+async fn an_owner_without_allow_linkage_is_refused_with_a_pointer_to_it() {
+    let (f, token, _) = owner_fixture("link-owner-no-flag", &[]).await;
+    for flag in [Value::Null, json!(false)] {
+        let r = call(
+            &f.state,
+            Some(&token),
+            PLAN,
+            json!({ "owner_address": OWNER, "actions": two_new_recipients(bob(), carol()), "allow_linkage": flag }),
+        )
+        .await;
+        assert_eq!(code(&r), 120);
+        assert!(
+            message(&r).contains("allow_linkage"),
+            "the owner refusal names allow_linkage"
+        );
+    }
+    assert!(f.approver.prompts(PLAN).is_empty());
+}
+
+/// An owner batch that opens one channel is unaffected by the flag: the usual
+/// prompt (a grant covers it), no linkage recorded.
+#[tokio::test]
+async fn allow_linkage_on_a_single_new_channel_changes_nothing() {
+    let (f, token, id) = owner_fixture("link-owner-one", &[]).await;
+    grant_forever(&f.state, &id).await;
+    let p = ok(call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "actions": transfer("0x3"), "allow_linkage": true }),
+    )
+    .await);
+    assert_eq!(p["summary"]["linkage_allowed"], json!(false));
+    assert_eq!(p["summary"]["channels_opened"], json!(1));
+    assert!(f.approver.prompts(PLAN).is_empty(), "the grant covers it");
+}
+
+/// Accounts can't opt in: `allow_linkage: true` is a 114 with a reason, before
+/// any prompt, whatever the batch.
+#[tokio::test]
+async fn an_account_cannot_pass_allow_linkage() {
+    let (node, _) = funded_pool();
+    node.register(dave(), crypto::public_key(Felt::from(0x5eed4_u64)));
+    let f = fixture("link-account-flag", node, &[]);
+    let (token, _) = pair(&f.state, "app").await;
+    for actions in [two_new_recipients(carol(), dave()), transfer("0x1e")] {
+        let r = call(
+            &f.state,
+            Some(&token),
+            PLAN,
+            json!({ "actions": actions, "allow_linkage": true }),
+        )
+        .await;
+        assert_eq!(code(&r), 114);
+        assert_eq!(reason(&r).as_deref(), Some("LINKAGE_OWNERS_ONLY"));
+    }
+    let r = call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "actions": transfer("0x1e"), "allow_linkage": "yes" }),
+    )
+    .await;
+    assert_eq!(code(&r), 114);
+    assert!(f.approver.prompts(PLAN).is_empty());
+}
+
+/// An account without the flag keeps today's refusal, message unchanged.
+#[tokio::test]
+async fn an_account_batch_opening_two_channels_is_still_refused() {
+    let (node, _) = funded_pool();
+    node.register(dave(), crypto::public_key(Felt::from(0x5eed4_u64)));
+    let f = fixture("link-account", node, &[]);
+    let (token, _) = pair(&f.state, "app").await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "actions": two_new_recipients(carol(), dave()) }),
+    )
+    .await;
+    assert_eq!(code(&r), 120);
+    assert!(
+        message(&r).ends_with(
+            "this batch would open more than one channel at once, letting an observer link them to one \
+             sender. Send to one new recipient per batch."
+        ),
+        "the account refusal changed"
+    );
+    assert!(f.approver.prompts(PLAN).is_empty());
 }

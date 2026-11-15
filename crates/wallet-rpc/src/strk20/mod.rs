@@ -651,12 +651,54 @@ struct Planned {
     plan: Plan,
 }
 
+/// Whether a batch that opens more than one channel may be planned (#64).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Linkage {
+    /// Refuse it (`PRIVACY_LEAK`): accounts always, owners by default.
+    Refuse,
+    /// Plan it anyway: an owner's `companion_strk20Plan { allow_linkage: true }`.
+    /// The plan handler then discloses the linkage in a prompt a grant never
+    /// covers.
+    Allow,
+}
+
+/// The `PRIVACY_LEAK` refusal of a batch that opens more than one channel. An
+/// owner is pointed at `allow_linkage`; an account's message is unchanged.
+fn linkage_refused(subject: &Subject) -> WalletRpcError {
+    let base = "this batch would open more than one channel at once, letting an observer link them to one sender. \
+                Send to one new recipient per batch";
+    WalletRpcError::PrivacyLeak(match subject {
+        Subject::Account => format!("{base}."),
+        Subject::Owner(_) => format!(
+            "{base}, or, if this owner contract must pay several new recipients atomically, pass allow_linkage: true \
+             to companion_strk20Plan (owners only; the user is then shown which recipients become publicly linked)."
+        ),
+    })
+}
+
+/// The recipients of the channels a planned batch opens, in action order.
+pub(super) fn opened_channels(plan: &Plan) -> Vec<Felt> {
+    plan.actions
+        .iter()
+        .filter_map(|a| match a {
+            strk20::actions::ClientAction::OpenChannel { recipient_addr, .. } => Some(*recipient_addr),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Discover the subject's state at `head − PROVING_LAG` and at `latest`,
 /// refuse if they differ, and plan `intent` with randomness drawn once from the
-/// OS. Refuses a batch that would link channels (`PRIVACY_LEAK`). For an owner,
-/// also checks that it still advertises SRC5 custom validation at the
+/// OS. Refuses a batch that would link channels (`PRIVACY_LEAK`) unless
+/// `linkage` is [`Linkage::Allow`] (#64); no other check depends on it. For an
+/// owner, also checks that it still advertises SRC5 custom validation at the
 /// reference block (§4, "Failing early").
-async fn plan_at_reference(state: &ServerState, ctx: &Ctx, intent: &Intent) -> Result<Planned, WalletRpcError> {
+async fn plan_at_reference(
+    state: &ServerState,
+    ctx: &Ctx,
+    intent: &Intent,
+    linkage: Linkage,
+) -> Result<Planned, WalletRpcError> {
     let head = block_number(ctx.node.as_ref()).await?;
     let block = head.saturating_sub(PROVING_LAG);
     // The prover executes the account's signature check at `block`. An account
@@ -690,12 +732,8 @@ async fn plan_at_reference(state: &ServerState, ctx: &Ctx, intent: &Intent) -> R
     }
     // Randomness is drawn here, once: a stored plan never redraws it (§5.2).
     let plan: Plan = planner::plan(intent, &st, &mut OsRandomness).map_err(map_strk20)?;
-    if plan.warnings.contains(&Warning::UserLinkage) {
-        return Err(WalletRpcError::PrivacyLeak(
-            "this batch would open more than one channel at once, letting an observer link them to one sender. \
-             Send to one new recipient per batch."
-                .into(),
-        ));
+    if plan.warnings.contains(&Warning::UserLinkage) && linkage == Linkage::Refuse {
+        return Err(linkage_refused(&ctx.subject));
     }
     Ok(Planned { block, user_sk, state: st, plan })
 }
@@ -723,7 +761,7 @@ async fn prepare(
     submission: &str,
 ) -> Result<Prepared, WalletRpcError> {
     let prover = prover_or_err(state)?;
-    let Planned { block, user_sk, plan, .. } = plan_at_reference(state, ctx, intent).await?;
+    let Planned { block, user_sk, plan, .. } = plan_at_reference(state, ctx, intent, Linkage::Refuse).await?;
 
     // A test screener key that isn't this pool's fails here, before the prompt
     // and a wasted proof.

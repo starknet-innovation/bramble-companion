@@ -8,6 +8,50 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-15 — STRK20 owners may open several channels in one batch (#64)
+
+**Did**
+- `companion_strk20Plan` takes `allow_linkage?: bool`, owners only.
+  `plan_at_reference` takes a `Linkage` (`Refuse` / `Allow`); only an owner's
+  plan with the flag passes `Allow`, and the one-shot `prepare()` always passes
+  `Refuse`.
+- An account with the flag gets 114 `LINKAGE_OWNERS_ONLY`. An owner without it
+  gets the 120 refusal, whose message now names `allow_linkage`. The account
+  message is unchanged.
+- When the flag lets through a batch that opens more than one channel, the plan
+  prompt adds a `PUBLIC LINKAGE` disclosure listing every recipient, and goes
+  through `Caller::approve_always` (never covered by a grant). The summary adds
+  `channels_opened` and `linkage_allowed`.
+- Tests: planner unit test (two new recipients → consecutive channel indices,
+  one subchannel and first note each, change, warning set); six dispatch tests
+  in `tests/strk20_disclosure.rs` (owner with flag: prompt under a grant lists
+  both recipients, summary, prove with the stub prover; refused prompt stores
+  nothing; owner without flag → 120 naming the flag; flag on one channel changes
+  nothing; account with flag → 114; account without → 120 unchanged).
+- Docs: `usage.rs`, `strk20.md`, `wallet-rpc.md`, design #48 §11.4.
+
+**Decisions**
+- Option 1 of #64 (per-plan flag), not a default skip or an enrolment flag:
+  the linkage depends on each batch's recipients. See design #48 §11.4.
+- The disclosure says the recipient-to-recipient link is new public
+  information. It does not repeat the issue's "already public" argument, which
+  only holds for the owner's own identity.
+- `approve_always` for linking plans: a grant should not let an agent add a
+  permanent public privacy cost the user never saw.
+
+**Verify**
+- `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings`
+  at the workspace root: green.
+
+**Next / Resume**
+- None for #64. A live owner run with two new recipients would need an owner
+  contract that approves such a plan (no on-chain transaction was sent).
+
+**Notes / caveats**
+- Pool check at `4026da7`: several `open_channel`s in one batch are valid (the
+  index check reads index − 1, and `main` applies each action's writes before
+  the next). No ordering issue found.
+
 ## 2026-11-15 — Fee bounds pad amount and price separately; fit to balance (#61)
 
 **Did**
