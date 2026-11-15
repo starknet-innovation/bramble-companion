@@ -1204,3 +1204,127 @@ async fn an_account_batch_opening_two_channels_is_still_refused() {
     );
     assert!(f.approver.prompts(PLAN).is_empty());
 }
+
+// ── reveal_actions on a transfer plan (#48 D3/D6, #66) ───────────────────────
+
+const REVEAL: &str = "companion_strk20Plan (reveal_actions)";
+
+/// A transfer to carol (a new channel) and a withdrawal, in one batch.
+fn transfer_and_withdraw() -> Value {
+    json!([
+        { "type": "transfer", "token": STRK, "amount": "0x1e", "recipient": format!("{:#x}", carol()) },
+        { "type": "withdraw", "token": STRK, "amount": "0x5", "recipient": "0xa11ce" },
+    ])
+}
+
+/// D3/D6: reveal_actions always prompts, even when a grant covers the plan
+/// prompt, and the prompt states what the actions disclose: channel keys, the
+/// new channel's random value (the same key and the sender), each
+/// withdrawal's random value (the sender address), and not the viewing key.
+/// The actions come back to the caller, hash to `plan_hash`, and stay out of
+/// the request log. (A register plan is never revealed: `dispatch.rs`.)
+#[tokio::test]
+async fn reveal_actions_on_a_transfer_prompts_even_under_a_grant_and_returns_the_hashed_actions() {
+    let (node, _) = funded_pool();
+    let f = fixture("reveal-transfer", node, &[]);
+    let (token, id) = pair(&f.state, "app").await;
+    grant_forever(&f.state, &id).await;
+    let p = ok(call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "actions": transfer_and_withdraw(), "reveal_actions": true }),
+    )
+    .await);
+
+    assert!(f.approver.prompts(PLAN).is_empty(), "the grant covers the plan");
+    let reveal = f.approver.prompts(REVEAL);
+    assert_eq!(reveal.len(), 1);
+    for (i, want) in [
+        "channel key",
+        "every past and",
+        "future private payment",
+        "cannot be revoked",
+        "random value of a new channel",
+        "1 withdrawal(s)",
+        "auditor copy of the sender address",
+        "does not reveal the viewing key",
+        "does not let anyone spend",
+    ]
+    .iter()
+    .enumerate()
+    {
+        assert!(reveal[0].contains(want), "reveal prompt lacks item #{i}");
+    }
+
+    assert_eq!(p["actions_revealed"], json!(true));
+    assert!(p.get("reveal_refused").is_none());
+    let actions = p["client_actions"].as_array().unwrap();
+    let types: Vec<&str> = actions.iter().map(|a| a["type"].as_str().unwrap()).collect();
+    assert!(!types.contains(&"set_viewing_key"));
+    assert!(types.contains(&"open_channel") && types.contains(&"withdraw"));
+    // The new channel's key, as the pool derives it, is in its open_subchannel.
+    let carol_ck = hashes::channel_key(
+        user(),
+        user_sk(),
+        carol(),
+        crypto::public_key(Felt::from(0x5eed3_u64)),
+    );
+    assert!(actions.iter().any(|a| a["type"] == json!("open_subchannel")
+        && felt_of(&a["channel_key"]) == carol_ck));
+    // actions_hash = poseidon(felts); plan_hash = SNIP-12 of the typed data.
+    let felts: Vec<Felt> = p["client_actions_felts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(felt_of)
+        .collect();
+    assert_eq!(hashes::poseidon_hash_many(&felts), felt_of(&p["actions_hash"]));
+    let again =
+        wallet_rpc::strk20::plan::plan_hash(ChainId::Sepolia, &pool(), &user(), &felts).unwrap();
+    assert_eq!(again.plan_hash, felt_of(&p["plan_hash"]));
+
+    // The log keeps the plan, not its actions: no random value, no key.
+    let log = logged(&f.state, PLAN).await;
+    assert!(log.contains("<redacted>") && log.contains(p["plan_hash"].as_str().unwrap()));
+    let randoms: Vec<Felt> = actions
+        .iter()
+        .filter_map(|a| a.get("random").map(felt_of))
+        .collect();
+    assert_eq!(randoms.len(), 2, "open_channel and withdraw");
+    for (i, r) in randoms.iter().enumerate() {
+        for s in spellings(*r) {
+            assert!(!log.contains(&s), "random #{i} in the log");
+        }
+    }
+    assert_no_keys(&log, &[carol_ck]);
+}
+
+/// Refusing the reveal prompt still returns (and keeps) the plan, without
+/// actions and without a `reveal_refused` reason (the user refused, not strkd).
+#[tokio::test]
+async fn refusing_the_reveal_returns_the_plan_without_actions() {
+    let (node, _) = funded_pool();
+    let f = fixture("reveal-no", node, &[REVEAL]);
+    let (token, _) = pair(&f.state, "app").await;
+    let p = ok(call(
+        &f.state,
+        Some(&token),
+        PLAN,
+        json!({ "actions": transfer("0x1e"), "reveal_actions": true }),
+    )
+    .await);
+    assert_eq!(f.approver.prompts(PLAN).len(), 1);
+    assert_eq!(f.approver.prompts(REVEAL).len(), 1);
+    assert_eq!(p["actions_revealed"], json!(false));
+    assert!(p.get("reveal_refused").is_none());
+    assert!(p.get("client_actions").is_none() && p.get("client_actions_felts").is_none());
+    let d = call(
+        &f.state,
+        Some(&token),
+        "companion_strk20DiscardPlan",
+        json!({ "plan_id": p["plan_id"] }),
+    )
+    .await;
+    assert_eq!(d.result, Some(json!(true)));
+}
