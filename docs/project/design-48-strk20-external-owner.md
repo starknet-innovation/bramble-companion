@@ -791,3 +791,46 @@ Added after phase 1. Where this section differs from §5.6, §6 or §7, this sec
   passes. Each channel appends to a different recipient's channel list and writes its own marker
   and outgoing slot, so nothing collides. The SDK's compiler only warns (`USER_LINKAGE`); it does
   not refuse.
+
+### 11.5 `reveal_actions` never reveals a register batch (#66)
+
+Added after phase 1. Where this section differs from D3, §5.6 or §11.1, this section wins.
+
+- **Problem.** A register batch carries `SetViewingKey { random }`. At pool commit `4026da7` (the
+  deployed class), `set_viewing_key` passes `random` verbatim as the `ephemeral_secret` of
+  `encrypt_private_key` (`utils.cairo`), and stores `[auditor_pk, (random·G).x, enc]` with
+  `enc = h('ENC_PRIVATE_KEY_TAG:V1', (random·K_auditor).x) + sk` (felt addition), readable by anyone
+  through `get_enc_private_key` and the `ViewingKeySet` event. So `random` plus public data gives
+  `sk = enc − h(..)`: the whole viewing key, not one channel. Until this fix, `reveal_actions` on a
+  register plan returned `random` in `client_actions` and `client_actions_felts`, behind a prompt
+  that only spoke of channel keys. Present on `main` since #55, never released (not in v0.4.0).
+- **Decision.** A batch whose actions contain `SetViewingKey` is never revealed, whatever the user
+  answers. `companion_strk20Plan` still plans, prompts (the plan prompt, as usual), stores and
+  returns the plan with `plan_hash`, `typed_data` and `summary`. With `reveal_actions: true` it adds
+  `actions_revealed: false` and `reveal_refused: "REVEAL_UNSAFE_FOR_REGISTER"`, shows **no** reveal
+  prompt, and returns no actions or felts.
+- **Why a result field, not an error.** A refused reveal already returns the plan without the actions
+  (§11.1, #55); this keeps the same shape, so a caller that handles a refused prompt handles this
+  too. Failing the whole call would make `register: true, reveal_actions: true` unusable for no
+  gain: the plan itself discloses nothing. `reveal_refused` tells the two cases apart: it is set only
+  when strkd refused, never when the user did.
+- **Cost.** An approver can no longer recompute a register plan's `plan_hash` from revealed actions.
+  A register plan has nothing to approve beyond "register this subject and open its self-channel",
+  which the summary states; the batch's other values are fresh randomness.
+- **One gate.** `plan::reveal_refusal` decides it before the reveal prompt; `plan::revealed` is the
+  only path from stored actions to a result and applies it again. `action_json` no longer prints a
+  `SetViewingKey.random` even if reached.
+- **What a reveal still discloses** (the prompt now says each): channel keys (every note on the
+  channel); `OpenChannel.random`, the `ephemeral_secret` of `encrypt_channel_info` to the new
+  recipient, which decrypts to that channel's key (already in the batch's `open_subchannel`) and the
+  sender address; `Withdraw.random`, the `ephemeral_secret` of `encrypt_user_addr` to the auditor,
+  which decrypts to the sender address, so the holder can show anyone which address made the
+  withdrawal. Salts are stored in the clear by the pool. None of these gives the viewing key.
+- **Audit.** No other path returns a client action: the request log redacts `client_actions(_felts)`
+  (unchanged, and a register plan's result no longer has them), STRK20 proving jobs are unrecorded and
+  their `result` is `{call, proof, notes}` built from the pool's server-action output, prover errors
+  are fixed text, `companion_strk20ChannelKey` returns one channel key, `notes` locators hold no
+  random value, and `examples/strk20_live.rs` never passes `reveal_actions`. The remote (deposit)
+  prover's own error text is returned scrubbed of `user_sk` only; that prover already receives the
+  whole invocation, so its echo adds nothing it lacks, but the text reaches the caller and the log
+  (noted on #66 as a follow-up).

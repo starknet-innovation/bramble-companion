@@ -46,6 +46,10 @@ pub const MAX_PLANS_TOTAL: usize = 32;
 const METHOD: &str = "companion_strk20Plan";
 /// The method label of the separate `reveal_actions` prompt.
 const REVEAL_METHOD: &str = "companion_strk20Plan (reveal_actions)";
+/// `reveal_refused` when a batch registers the viewing key (#66): its
+/// `SetViewingKey.random` is the ephemeral scalar the pool encrypts the new
+/// viewing key to the auditor with, so revealing it reveals the viewing key.
+pub const REVEAL_UNSAFE_FOR_REGISTER: &str = "REVEAL_UNSAFE_FOR_REGISTER";
 
 // ── the approval hash (§5.3) ─────────────────────────────────────────────────
 
@@ -410,12 +414,39 @@ fn amount(a: u128) -> String {
     format!("{a:#x}")
 }
 
+/// Why a batch's actions may never be revealed, whatever the user answers.
+///
+/// `SetViewingKey { random }` (a register batch): the pool's `set_viewing_key`
+/// passes `random` as the `ephemeral_secret` of `encrypt_private_key`, and
+/// stores `enc = h(ENC_PRIVATE_KEY_TAG, (random·K_auditor).x) + sk` publicly
+/// (`get_enc_private_key`). Whoever holds `random` once the batch lands
+/// computes `sk = enc − h(..)`: the whole viewing key, not one channel. So the
+/// reveal is refused before its prompt, and nothing of the actions comes back.
+fn reveal_refusal(actions: &[ClientAction]) -> Option<&'static str> {
+    actions
+        .iter()
+        .any(|a| matches!(a, ClientAction::SetViewingKey { .. }))
+        .then_some(REVEAL_UNSAFE_FOR_REGISTER)
+}
+
+/// The `reveal_actions` view of a batch: `(client_actions, client_actions_felts)`,
+/// or the reason it may not be revealed ([`reveal_refusal`]). The only path
+/// that turns stored actions into a result.
+fn revealed(actions: &[ClientAction], felts: &[Felt]) -> Result<(Value, Value), &'static str> {
+    if let Some(reason) = reveal_refusal(actions) {
+        return Err(reason);
+    }
+    Ok((
+        json!(actions.iter().map(action_json).collect::<Vec<_>>()),
+        json!(felts.iter().map(hex).collect::<Vec<_>>()),
+    ))
+}
+
 /// A client action as typed JSON (the `reveal_actions` view).
 fn action_json(a: &ClientAction) -> Value {
     match *a {
-        ClientAction::SetViewingKey { random } => {
-            json!({ "type": "set_viewing_key", "random": hex(&random) })
-        }
+        // Never revealed ([`reveal_refusal`]); its `random` stays out even so.
+        ClientAction::SetViewingKey { .. } => json!({ "type": "set_viewing_key" }),
         ClientAction::OpenChannel {
             recipient_addr,
             index,
@@ -557,13 +588,32 @@ fn plan_prompt(
     )
 }
 
-fn reveal_prompt(ctx: &Ctx, plan_id: &str, n_channel_keys: usize) -> String {
+/// The reveal prompt. Only for a batch [`reveal_refusal`] lets through, so no
+/// viewing key is in it. What its secrets disclose, per the pool's
+/// `utils.cairo`: channel keys (every note on the channel); `OpenChannel.random`,
+/// the ephemeral secret of the channel info sent to the new recipient, which
+/// decrypts to that channel's key (already in the batch's `open_subchannel`)
+/// and this sender's address; `Withdraw.random`, the ephemeral secret of the
+/// auditor's copy of the sender's address, which decrypts to this address.
+/// Salts end up in pool storage in the clear.
+fn reveal_prompt(ctx: &Ctx, plan_id: &str, n_channel_keys: usize, withdrawals: usize) -> String {
+    let withdraw = if withdrawals > 0 {
+        format!(
+            " The random value of each of its {withdrawals} withdrawal(s) decrypts the pool's auditor copy of the \
+             sender address: once the batch lands, whoever holds it can show anyone that this address made that \
+             withdrawal."
+        )
+    } else {
+        String::new()
+    };
     format!(
         "Reveal the full action list of STRK20 plan {plan_id} on {} for {}. It contains {n_channel_keys} channel \
          key(s), plus note indices, salts and random values. Whoever holds a channel key can see every past and \
          future private payment on that channel (tokens, amounts, and the transactions that carried them), and this \
-         cannot be revoked: the key is fixed for that sender and recipient. It does not let anyone spend these funds \
-         or send from this address. Refusing still returns the plan, without the actions.",
+         cannot be revoked: the key is fixed for that sender and recipient. The random value of a new channel \
+         discloses the same channel key and this sender's address.{withdraw} It does not reveal the viewing key, and \
+         does not let anyone spend these funds or send from this address. Refusing still returns the plan, without \
+         the actions.",
         chain_name(ctx.chain),
         subject_text(ctx),
     )
@@ -613,7 +663,7 @@ fn linkage_owners_only() -> WalletRpcError {
 /// reveal_actions?, allow_linkage?, ttl_secs?, chainId? }` → `{ plan_id,
 /// plan_version, expires_at, plan_block, chain_id, pool, owner, subject,
 /// controller, plan_hash, actions_hash, typed_data, summary, notes,
-/// actions_revealed?, client_actions?, client_actions_felts? }`.
+/// actions_revealed?, reveal_refused?, client_actions?, client_actions_felts? }`.
 ///
 /// `notes` locates each transfer note the plan creates (#49). It holds no
 /// channel key, so it is returned without `reveal_actions`.
@@ -621,7 +671,10 @@ fn linkage_owners_only() -> WalletRpcError {
 /// Plans `actions` (or `register: true`) against `head − PROVING_LAG`, prompts
 /// (a grant may cover it), and stores the plan. Signs nothing, proves nothing.
 /// `reveal_actions: true` adds a second prompt that a grant never covers; if
-/// refused, the plan still comes back, without the actions.
+/// refused, the plan still comes back, without the actions. A batch that
+/// registers the viewing key is never revealed (#66, [`reveal_refusal`]): no
+/// reveal prompt, and the plan comes back without the actions, with
+/// `actions_revealed: false` and `reveal_refused: "REVEAL_UNSAFE_FOR_REGISTER"`.
 ///
 /// `allow_linkage: true` (owners only, #64) lets the batch open more than one
 /// channel. When it does, the prompt lists the recipients it links publicly
@@ -726,6 +779,14 @@ pub async fn plan(
     let created_at_ms = now_unix_ms();
     let expires_at_ms = created_at_ms + ttl * 1000;
     let n_channel_keys = channel_keys(&plan.actions);
+    let n_withdrawals = plan
+        .actions
+        .iter()
+        .filter(|a| matches!(a, ClientAction::Withdraw { .. }))
+        .count();
+    // Decided before the plan moves into the store: a register batch is never
+    // revealed, so its reveal prompt is never shown.
+    let reveal_refused = if reveal { reveal_refusal(&plan.actions) } else { None };
     let mut out = json!({
         "plan_id": id,
         "plan_version": PLAN_VERSION,
@@ -770,23 +831,32 @@ pub async fn plan(
         .strk20_plans()?
         .insert(stored, now_unix_ms())?;
 
-    if reveal {
+    if let Some(reason) = reveal_refused {
+        out["actions_revealed"] = json!(false);
+        out["reveal_refused"] = json!(reason);
+    } else if reveal {
         let approved = caller
             .approve_always(
                 state,
                 REVEAL_METHOD,
-                reveal_prompt(&ctx, &id, n_channel_keys),
+                reveal_prompt(&ctx, &id, n_channel_keys, n_withdrawals),
             )
             .await;
         match approved {
             Ok(()) => {
                 let mut session = state.session.lock().await;
                 let p = session.strk20_plans()?.get(&id, &client, now_unix_ms())?;
-                out["client_actions"] =
-                    json!(p.actions.iter().map(action_json).collect::<Vec<_>>());
-                out["client_actions_felts"] =
-                    json!(p.client_actions_felts.iter().map(hex).collect::<Vec<_>>());
-                out["actions_revealed"] = json!(true);
+                match revealed(&p.actions, &p.client_actions_felts) {
+                    Ok((actions, felts)) => {
+                        out["client_actions"] = actions;
+                        out["client_actions_felts"] = felts;
+                        out["actions_revealed"] = json!(true);
+                    }
+                    Err(reason) => {
+                        out["actions_revealed"] = json!(false);
+                        out["reveal_refused"] = json!(reason);
+                    }
+                }
             }
             Err(WalletRpcError::UserRefused) => out["actions_revealed"] = json!(false),
             Err(e) => return Err(e),
@@ -1009,5 +1079,90 @@ mod tests {
             matches!(p.actions[0], ClientAction::UseNote { channel_key, .. } if channel_key == Felt::ZERO)
         );
         assert_eq!(p.client_actions_felts, vec![Felt::ZERO]);
+    }
+
+    /// A fresh, non-zero test scalar below 2^248 (drawn, not hard-coded).
+    fn test_scalar() -> Felt {
+        let mut b = [0u8; 31];
+        getrandom::getrandom(&mut b).unwrap();
+        b[30] |= 1;
+        Felt::from_bytes_be_slice(&b)
+    }
+
+    /// #66: why `SetViewingKey.random` must never leave strkd. Mirrors the
+    /// pool's `set_viewing_key` / `encrypt_private_key` (starknet-privacy
+    /// 4026da7, `privacy.cairo`, `utils.cairo`) on a test-seed viewing key:
+    /// with `random` and the public ciphertext, anyone recovers the key. Then
+    /// the reveal view refuses the batch and never carries `random`.
+    #[test]
+    fn set_viewing_key_random_recovers_the_viewing_key_so_it_is_never_revealed() {
+        const TEST_MNEMONIC: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+                                     abandon abandon about";
+        let pool = f("0x123");
+        let sk = wallet_core::strk20_viewing_key(
+            TEST_MNEMONIC,
+            wallet_core::Domain::User,
+            0,
+            None,
+            &ChainId::Sepolia.as_felt(),
+            &pool,
+        )
+        .unwrap();
+        let auditor_sk = test_scalar();
+        let auditor_pk = strk20::crypto::public_key(auditor_sk);
+        let random = test_scalar();
+
+        // What the pool stores (get_enc_private_key): [auditor_pk, eph, enc].
+        let eph = strk20::crypto::public_key(random);
+        let enc = strk20::hashes::enc_private_key_hash(
+            strk20::crypto::shared_x(random, auditor_pk).unwrap(),
+        ) + sk;
+        // The auditor decrypts it with its own key: the construction is right.
+        let by_auditor = enc
+            - strk20::hashes::enc_private_key_hash(
+                strk20::crypto::shared_x(auditor_sk, eph).unwrap(),
+            );
+        assert!(by_auditor == sk, "the auditor must decrypt the viewing key");
+        // Anyone holding `random` does too, with public values only.
+        let by_random_holder = enc
+            - strk20::hashes::enc_private_key_hash(
+                strk20::crypto::shared_x(random, auditor_pk).unwrap(),
+            );
+        assert!(by_random_holder == sk, "random must recover the viewing key");
+
+        // A register batch: SetViewingKey, then the self-channel.
+        let actions = vec![
+            ClientAction::SetViewingKey { random },
+            ClientAction::OpenChannel {
+                recipient_addr: f("0xc0ffee"),
+                index: 0,
+                random: test_scalar(),
+                salt: test_scalar(),
+            },
+        ];
+        let felts = serialize_actions(&actions);
+        assert!(felts.contains(&random), "the hashed felts carry random");
+        assert_eq!(reveal_refusal(&actions), Some(REVEAL_UNSAFE_FOR_REGISTER));
+        assert!(matches!(
+            revealed(&actions, &felts),
+            Err(REVEAL_UNSAFE_FOR_REGISTER)
+        ));
+        // Even the typed view, were it reached, holds no random.
+        let typed = action_json(&actions[0]);
+        assert!(typed.get("random").is_none());
+        let spelled = typed.to_string();
+        assert!(!spelled.contains(&format!("{random:x}")));
+
+        // A batch without SetViewingKey is still revealable.
+        let transfer = vec![ClientAction::UseNote {
+            channel_key: test_scalar(),
+            token: f("0x4718"),
+            index: 0,
+        }];
+        let felts = serialize_actions(&transfer);
+        assert_eq!(reveal_refusal(&transfer), None);
+        let (typed, hashed) = revealed(&transfer, &felts).unwrap();
+        assert_eq!(typed.as_array().map(Vec::len), Some(1));
+        assert_eq!(hashed.as_array().map(Vec::len), Some(felts.len()));
     }
 }

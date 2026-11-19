@@ -243,11 +243,24 @@ All three parts of phase 1 are built (enrolment, the plan step, the prove step):
   `companion_typedDataHash` on the returned `typed_data` reproduces it.
 - **`reveal_actions`.** A second prompt through `Caller::approve_always` (a
   grant never covers it) says the actions hold channel keys, which disclose
-  every past and future payment on those channels, irrevocably, and cannot
-  spend. Approved: the result gains `client_actions` (typed JSON) and
-  `client_actions_felts`. Refused: the plan still comes back, with
-  `actions_revealed: false`. The request log replaces both fields with
-  `"<redacted>"` (`dispatch::redact_for_log`).
+  every past and future payment on those channels, irrevocably; that a new
+  channel's random value discloses the same key and the sender address; that
+  each withdrawal's random value decrypts the auditor's copy of the sender
+  address; and that none of it reveals the viewing key or can spend. Approved:
+  the result gains `client_actions` (typed JSON) and `client_actions_felts`.
+  Refused: the plan still comes back, with `actions_revealed: false`. The
+  request log replaces both fields with `"<redacted>"`
+  (`dispatch::redact_for_log`).
+- **Register batches are never revealed (#66).** `SetViewingKey.random` is the
+  ephemeral scalar the pool's `encrypt_private_key` uses to encrypt the new
+  viewing key to the auditor, stored publicly (`get_enc_private_key`): holding
+  it recovers the viewing key. So `plan::reveal_refusal` refuses the reveal of
+  any batch with a `SetViewingKey` before the reveal prompt: no prompt, no
+  actions, and the plan comes back as usual with `actions_revealed: false` and
+  `reveal_refused: "REVEAL_UNSAFE_FOR_REGISTER"` (same shape as a refused
+  prompt; `reveal_refused` is set only when strkd refused). `plan::revealed` is
+  the only path from stored actions to a result and re-applies the check.
+  Design #48 §11.5.
 - **Plan store.** `PlanStore` lives inside the unlocked `WalletSession`, so any
   lock (from RPC idle, the desktop, or tests) drops it, and a restart starts
   empty. Plans are keyed by a 128-bit random hex `plan_id` and bound to the

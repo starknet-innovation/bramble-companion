@@ -8,6 +8,51 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-16 — STRK20: `reveal_actions` never reveals a register batch (#66)
+
+**Did**
+- Fixed a viewing-key leak on `main` (since #55, unreleased, not in v0.4.0):
+  `companion_strk20Plan { register: true, reveal_actions: true }` returned
+  `SetViewingKey.random` in `client_actions` and `client_actions_felts`.
+  Verified against pool commit `4026da7`: `set_viewing_key` passes `random` as
+  the `ephemeral_secret` of `encrypt_private_key`, whose ciphertext is public
+  (`get_enc_private_key`), so `random` recovers the viewing key.
+- `plan::reveal_refusal` refuses the reveal of any batch with a
+  `SetViewingKey`, before the reveal prompt; `plan::revealed` is the only path
+  from stored actions to a result and re-checks; `action_json` omits
+  `SetViewingKey.random`. The plan still succeeds, with
+  `actions_revealed: false` and `reveal_refused: "REVEAL_UNSAFE_FOR_REGISTER"`.
+- Reveal prompt now states what remains revealable: channel keys, a new
+  channel's random value (same key + sender address), each withdrawal's random
+  value (decrypts the auditor's copy of the sender address), and that it does
+  not reveal the viewing key.
+- Tests: unit recovery demonstration in `strk20/plan.rs` (test seed, drawn
+  scalars); `tests/dispatch.rs` register + reveal refused for owner (under a
+  grant) and account, no reveal prompt, plan proves, and the prover's
+  `SetViewingKey.random` is in no result, job result or log row;
+  `tests/strk20_disclosure.rs` transfer + withdraw reveal (prompt wording,
+  hashes, log) and refused reveal (moved from the register-based tests).
+- Docs: `usage.rs`, `strk20.md`, `wallet-rpc.md`, design #48 §11.5.
+
+**Decisions**
+- A result field, not an error: same shape as a refused reveal prompt (#55),
+  and the plan itself discloses nothing. `reveal_refused` is set only when
+  strkd refused. See design #48 §11.5.
+- Withdraw and OpenChannel random values stay revealable (they disclose the
+  sender address and an already-revealed channel key, not the viewing key);
+  the prompt says so.
+
+**Verify**
+- `cargo test --locked` and `cargo clippy --locked --all-targets -- -D warnings`.
+
+**Next / Resume**
+- #63 (owner key shares) can build on this: register plans are never revealed.
+
+**Notes / caveats**
+- Follow-up noted on #66: the remote (deposit) prover's own error text is
+  returned scrubbed of `user_sk` only. It already holds the whole invocation,
+  but its echo would reach the caller and the request log.
+
 ## 2026-11-15 — STRK20 owners may open several channels in one batch (#64)
 
 **Did**

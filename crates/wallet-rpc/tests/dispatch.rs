@@ -2730,66 +2730,76 @@ async fn plan_for_an_owner_prompts_signs_nothing_and_returns_a_reproducible_hash
     assert_eq!(act["activity"], json!([]), "{act}");
 }
 
-/// D3/D6: reveal_actions always prompts, even when a grant covers the plan
-/// prompt. The actions come back to the caller but not into the request log.
-#[tokio::test]
-async fn reveal_actions_prompts_even_under_a_grant_and_returns_the_hashed_actions() {
-    let (state, approver) = plan_state("reveal", plan_node(true, Felt::ZERO), &[]);
-    let (token, id, _) = agent_with_account_and_id(&state).await;
-    enrol(&state, &token, "").await;
-    grant_forever(&state, &id).await;
-
-    let params = json!({ "owner_address": OWNER, "register": true, "reveal_actions": true });
-    let resp = call(&state, Some(&token), PLAN, params).await;
-    let p = resp.result.unwrap_or_else(|| panic!("{:?}", resp.error));
-    // The grant covered the plan prompt; the reveal prompt still showed.
-    assert!(prompted(&approver, PLAN).is_empty());
-    let reveal = prompted(&approver, REVEAL);
-    assert_eq!(reveal.len(), 1);
-    for want in ["channel key", "every past and", "future private payment", "cannot be revoked", "does not let anyone spend"] {
-        assert!(reveal[0].contains(want), "reveal prompt lacks {want:?}: {}", reveal[0]);
-    }
-
-    assert_eq!(p["actions_revealed"], json!(true));
-    let actions = p["client_actions"].as_array().unwrap();
-    assert_eq!(actions.len(), 2);
-    assert_eq!(actions[0]["type"], json!("set_viewing_key"));
-    assert_eq!(actions[1]["type"], json!("open_channel"));
-    assert_eq!(felt_of(&actions[1]["recipient_addr"]), Felt::from_hex(OWNER).unwrap());
-    // The felts are serialize_actions: the Span length prefix, then each action.
-    let felts: Vec<Felt> = p["client_actions_felts"].as_array().unwrap().iter().map(felt_of).collect();
-    assert_eq!(felts[0], Felt::TWO);
-    assert_eq!(felts.len(), 1 + 2 + 5);
-    // Recompute: actions_hash = poseidon(felts), plan_hash = SNIP-12 of the typed data.
-    assert_eq!(strk20::hashes::poseidon_hash_many(&felts), felt_of(&p["actions_hash"]));
-    let owner = Felt::from_hex(OWNER).unwrap();
-    let again = wallet_rpc::strk20::plan::plan_hash(ChainId::Sepolia, &sepolia_pool(), &owner, &felts).unwrap();
-    assert_eq!(again.plan_hash, felt_of(&p["plan_hash"]));
-    assert_eq!(typed_data_hash(&state, &token, &p).await, felt_of(&p["plan_hash"]));
-
-    // The request log keeps the plan but not its actions.
-    let log = state.log.lock().await.recent(20);
-    let entry = log.iter().find(|e| e.method == PLAN).expect("plan logged");
-    let logged = entry.result_json.as_deref().unwrap();
-    assert!(logged.contains("<redacted>") && logged.contains(p["plan_hash"].as_str().unwrap()), "{logged}");
-    let random = actions[0]["random"].as_str().unwrap();
-    assert!(!logged.contains(random), "the log holds a planned random value: {logged}");
+/// Every lowercase hex spelling of `f` a JSON string could carry.
+fn felt_spellings(f: Felt) -> [String; 2] {
+    [format!("{f:x}"), format!("{f:064x}")]
 }
 
-/// Refusing the reveal prompt still returns (and keeps) the plan, without actions.
+/// #66: `reveal_actions` on a register plan is refused before its prompt,
+/// for an owner (under a grant) and for an account. The plan still comes back
+/// (plan_hash, summary) with `actions_revealed: false` and the reason, and no
+/// actions. `SetViewingKey.random` (it would recover the viewing key, see
+/// `plan.rs`, `set_viewing_key_random_recovers_the_viewing_key_so_it_is_never_revealed`)
+/// is read back from the prover's input and found in no result, job result or
+/// request-log row. Assertion messages print no values (CodeQL).
+/// (Reveal on a transfer plan: `strk20_disclosure.rs`.)
 #[tokio::test]
-async fn refusing_the_reveal_returns_the_plan_without_actions() {
-    let (state, approver) = plan_state("reveal-no", plan_node(true, Felt::ZERO), &[REVEAL]);
-    let token = pair(&state, "app").await;
-    enrol(&state, &token, "").await;
-    let params = json!({ "owner_address": OWNER, "register": true, "reveal_actions": true });
-    let p = call(&state, Some(&token), PLAN, params).await.result.unwrap();
-    assert_eq!(prompted(&approver, PLAN).len(), 1);
-    assert_eq!(prompted(&approver, REVEAL).len(), 1);
-    assert_eq!(p["actions_revealed"], json!(false));
-    assert!(p.get("client_actions").is_none() && p.get("client_actions_felts").is_none());
-    let d = call(&state, Some(&token), "companion_strk20DiscardPlan", json!({ "plan_id": p["plan_id"] })).await;
-    assert_eq!(d.result, Some(json!(true)), "{:?}", d.error);
+async fn reveal_actions_on_a_register_plan_is_refused_before_its_prompt() {
+    for owner in [true, false] {
+        let f = prove_fixture(if owner { "reveal-reg-owner" } else { "reveal-reg-account" }, prove_node(), &[]);
+        let token = if owner {
+            let (token, id, _) = agent_with_account_and_id(&f.state).await;
+            enrol(&f.state, &token, "").await;
+            grant_forever(&f.state, &id).await;
+            token
+        } else {
+            pair(&f.state, "app").await
+        };
+        let params = if owner {
+            json!({ "owner_address": OWNER, "register": true, "reveal_actions": true })
+        } else {
+            json!({ "register": true, "reveal_actions": true })
+        };
+        let resp = call(&f.state, Some(&token), PLAN, params).await;
+        assert!(resp.error.is_none(), "the plan itself succeeds");
+        let p = resp.result.unwrap();
+        assert_eq!(p["actions_revealed"], json!(false));
+        assert_eq!(p["reveal_refused"], json!("REVEAL_UNSAFE_FOR_REGISTER"));
+        assert!(p.get("client_actions").is_none() && p.get("client_actions_felts").is_none());
+        assert_eq!(p["summary"]["register"], json!(true));
+        assert_eq!(p["summary"]["action_count"], json!(2));
+        assert!(p["plan_hash"].is_string() && p["typed_data"].is_object());
+        // No reveal prompt; the plan prompt as usual (covered by the owner's grant).
+        assert!(prompted(&f.approver, REVEAL).is_empty(), "no reveal prompt");
+        assert_eq!(prompted(&f.approver, PLAN).len(), usize::from(!owner));
+
+        // The plan is intact: prove it, and read random from the prover's input.
+        let prove = if owner {
+            json!({ "plan_id": p["plan_id"], "signature": [] })
+        } else {
+            json!({ "plan_id": p["plan_id"] })
+        };
+        let r = call(&f.state, Some(&token), PROVE, prove).await;
+        assert!(r.error.is_none(), "prove queues");
+        let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+        assert_eq!(job["status"], json!("succeeded"));
+        let payloads = f.prover.payloads.lock().unwrap().clone();
+        // calldata = [1, pool, compile_actions, len, user, user_sk, 2, 0 (SetViewingKey), random, …]
+        let calldata = hexes(&payloads[0]["transaction"]["calldata"]);
+        assert_eq!((calldata[6], calldata[7]), (Felt::TWO, Felt::ZERO), "SetViewingKey first");
+        let random = calldata[8];
+        assert!(random != Felt::ZERO);
+
+        let mut seen = vec![p.to_string(), job.to_string()];
+        for e in f.state.log.lock().await.recent(100) {
+            seen.push(format!("{} {:?} {:?}", e.outcome, e.params_json, e.result_json));
+        }
+        for (i, text) in seen.iter().enumerate() {
+            for s in felt_spellings(random) {
+                assert!(!text.contains(&s), "SetViewingKey.random in output #{i}");
+            }
+        }
+    }
 }
 
 /// A grant covers the plan prompt (D6).
