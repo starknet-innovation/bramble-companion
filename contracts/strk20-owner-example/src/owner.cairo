@@ -1,5 +1,5 @@
-//! Reference STRK20 owner contract for Bramble Companion issue #48. Not audited: a starting point, not a
-//! production wallet.
+//! Reference STRK20 owner contract for Bramble Companion issue #48. Not audited: a starting point,
+//! not a production wallet.
 //!
 //! A STRK20 note owner that is a contract, not a key. The privacy pool authenticates every
 //! private operation by calling back into the owner (`assert_valid_signature`, pool
@@ -20,8 +20,8 @@ use starknet::account::Call;
 pub const ICUSTOM_SIGNATURE_VALIDATION_ID: felt252 =
     0x2eb9faa4ce06e09879e93803798b87d22877b73964334356bf9e0d8cc22ded;
 
-/// SNIP-12 domain name and version of Bramble Companion's plan-approval format. A format change bumps the
-/// version (and Bramble Companion's `plan_version`) together.
+/// SNIP-12 domain name and version of Bramble Companion's plan-approval format. A format change
+/// bumps the version (and Bramble Companion's `plan_version`) together.
 pub const STRK20_PLAN_DOMAIN_NAME: felt252 = 'strkd.Strk20Plan';
 /// The felt 1, NOT the shortstring '1' (0x31). The typed-data JSON says `"version": "1"`, and
 /// SNIP-12 tooling (starknet.js `getHex`, krusty-kms) encodes a decimal-digit string as the
