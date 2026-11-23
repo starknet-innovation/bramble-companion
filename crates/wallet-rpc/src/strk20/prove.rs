@@ -198,7 +198,7 @@ fn reference_block(
         let oldest = head.saturating_sub(max_age) + 1;
         return Err(WalletRpcError::Precondition(format!(
             "reference block {block} is {} blocks behind the chain head ({head}); the pool accepts a proof for \
-             {validity} blocks after its reference block, and strkd keeps {PROOF_WINDOW_MARGIN} in hand for proving \
+             {validity} blocks after its reference block, and the companion keeps {PROOF_WINDOW_MARGIN} in hand for proving \
              and inclusion. Use a block_number from {oldest} on (or omit it).",
             head - block
         ))
@@ -417,13 +417,13 @@ pub async fn prove(
         (Subject::Owner(_), None) => {
             return Err(invalid(
                 "signature: required for an owner contract's plan (the felts its is_custom_signature_valid reads; \
-                 pass [] if it only checks an on-chain approval). strkd never signs for an owner.",
+                 pass [] if it only checks an on-chain approval). The companion never signs for an owner.",
             )
             .with_reason("SIGNATURE_REQUIRED"))
         }
         (Subject::Account, Some(_)) => {
             return Err(invalid(
-                "signature: not accepted for a strkd account's plan: strkd signs it with the account's key",
+                "signature: not accepted for a companion account's plan: the companion signs it with the account's key",
             )
             .with_reason("SIGNATURE_NOT_ALLOWED"))
         }

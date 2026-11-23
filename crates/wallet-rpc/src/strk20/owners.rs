@@ -125,7 +125,7 @@ pub async fn add_owner(
         let reg = session.registry()?;
         if reg.accounts.iter().any(|a| a.address == owner) {
             return Err(invalid(format!(
-                "{owner} is a strkd account: use it with account_address, not as an owner"
+                "{owner} is a companion account: use it with account_address, not as an owner"
             )));
         }
         if reg
@@ -179,7 +179,7 @@ pub async fn add_owner(
     if let Some(pk) = registered {
         if pk != viewing_public_key {
             return Err(WalletRpcError::Precondition(format!(
-                "{owner} is registered with the pool under a viewing key that controller {} does not derive, so strkd \
+                "{owner} is registered with the pool under a viewing key that controller {} does not derive, so the companion \
                  cannot read or spend its notes and will not enrol it (importing keys is not supported).",
                 ctx.account.address
             ))
@@ -197,7 +197,7 @@ pub async fn add_owner(
             "companion_strk20AddOwner",
             format!(
                 "Enrol contract {owner} as a STRK20 owner on {}, {}, controlled by your account {}.{label_note} \
-                 strkd will derive and hold a private key for this contract's private notes. strkd cannot check who \
+                 The companion will derive and hold a private key for this contract's private notes. The companion cannot check who \
                  controls this contract; its own signature check decides every spend. The contract's code also sees \
                  that key and the private channel keys of every batch while it is proved (the pool hands them to \
                  its check), so it could leak them: enrol only a contract whose code you trust. {}",

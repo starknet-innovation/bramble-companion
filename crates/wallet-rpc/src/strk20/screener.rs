@@ -51,7 +51,7 @@ pub fn validate(cfg: &prover::Strk20Config, chain: ChainId) -> Result<(), String
     http_or_empty("paymaster URL", &cfg.paymaster_url)?;
     if !cfg.screener_key.trim().is_empty() {
         if chain == ChainId::Mainnet {
-            return Err("a local STRK20 screener key is testnet-only: strkd refuses it on mainnet".into());
+            return Err("a local STRK20 screener key is testnet-only: the companion refuses it on mainnet".into());
         }
         parse_key(&cfg.screener_key)?;
     }
@@ -129,7 +129,7 @@ pub async fn pool_info(node: &dyn StarknetRpc, pool: &Felt, screener_key: Option
     let mut warnings = Vec::new();
     if !known {
         warnings.push(format!(
-            "class {class:#x} is not the privacy-pool class strkd is built against ({KNOWN_POOL_CLASS}); STRK20 calls may fail"
+            "class {class:#x} is not the privacy-pool class the companion is built against ({KNOWN_POOL_CLASS}); STRK20 calls may fail"
         ));
     }
     if screener.is_none() {

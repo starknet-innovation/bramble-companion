@@ -337,7 +337,7 @@ impl PlanStore {
         }
         if self.plans.len() >= MAX_PLANS_TOTAL {
             return Err(plan_limit(format!(
-                "strkd already holds {MAX_PLANS_TOTAL} live plans: discard one or let them expire"
+                "The companion already holds {MAX_PLANS_TOTAL} live plans: discard one or let them expire"
             )));
         }
         Ok(())
@@ -574,12 +574,12 @@ fn plan_prompt(
     let next = match ctx.subject {
         Subject::Owner(_) => format!(
             "Nothing is signed or proved now. Before the proof can be built, the owner contract must approve this \
-             plan on-chain (plan_hash {}); strkd never signs for it. The proof is built later, {where_proved}, and \
+             plan on-chain (plan_hash {}); the companion never signs for it. The proof is built later, {where_proved}, and \
              returned unsubmitted unless you choose otherwise then.",
             hex(plan_hash)
         ),
         Subject::Account => format!(
-            "Nothing is signed or proved now; strkd signs with this account when the plan is proved later, \
+            "Nothing is signed or proved now; the companion signs with this account when the plan is proved later, \
              {where_proved}, and returns it unsubmitted unless you choose otherwise then."
         ),
     };
@@ -657,7 +657,7 @@ fn summary_json(
 /// `LINKAGE_OWNERS_ONLY` (114): `allow_linkage` on an account's plan.
 fn linkage_owners_only() -> WalletRpcError {
     invalid(
-        "allow_linkage is accepted only for an owner contract (owner_address). A strkd account's batch may open \
+        "allow_linkage is accepted only for an owner contract (owner_address). A companion account's batch may open \
          at most one new channel: send to one new recipient per batch.",
     )
     .with_reason("LINKAGE_OWNERS_ONLY")
@@ -709,7 +709,7 @@ pub async fn plan(
         if has_deposit(&actions) {
             return Err(WalletRpcError::NotImplemented(
                 "deposits can't be planned yet (they need a screening prover): use wallet_strk20InvokeTransaction \
-                 from a strkd account"
+                 from a companion account"
                     .into(),
             )
             .with_reason("DEPOSIT_UNSUPPORTED"));

@@ -2904,10 +2904,10 @@ async fn locking_the_wallet_wipes_plans() {
     assert_eq!(reason(&gone).as_deref(), Some("PLAN_NOT_FOUND"));
 }
 
-/// §2.1: plans also work for strkd accounts, without an SRC5 check; strkd
-/// signs at prove time.
+/// §2.1: plans also work for the wallet's own accounts, without an SRC5 check;
+/// the companion signs at prove time.
 #[tokio::test]
-async fn plans_work_for_strkd_accounts() {
+async fn plans_work_for_own_accounts() {
     let node = plan_node(false, Felt::ZERO);
     let (state, approver) = plan_state("account", node.clone(), &[]);
     let token = pair(&state, "app").await;
@@ -2919,7 +2919,7 @@ async fn plans_work_for_strkd_accounts() {
     assert_eq!(p["controller"], json!(account));
     assert_eq!(typed_data_hash(&state, &token, &p).await, felt_of(&p["plan_hash"]));
     let text = &prompted(&approver, PLAN)[0];
-    assert!(text.contains("strkd signs with this account") && text.contains(&account), "prompt lacks the signing account ({} chars)", text.len());
+    assert!(text.contains("the companion signs with this account") && text.contains(&account), "prompt lacks the signing account ({} chars)", text.len());
     assert!(node.src5_blocks().is_empty());
     assert!(node.methods().iter().all(|m| m != "starknet_getNonce"));
 }
