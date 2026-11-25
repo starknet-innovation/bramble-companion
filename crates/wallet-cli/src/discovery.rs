@@ -11,12 +11,12 @@ use std::path::PathBuf;
 use serde_json::Value;
 
 /// The desktop app's Tauri bundle identifier (see `tauri.conf.json`).
-const APP_IDENTIFIER: &str = "org.starknet.strkd";
+const APP_IDENTIFIER: &str = "org.starknet.bramble-companion";
 
 /// Identifiers earlier versions of the app used, newest first. Mirrors
 /// `wallet_rpc::data_migration::LEGACY_APP_IDENTIFIERS`: an app that has not
 /// been updated yet still keeps its data (and `port.lock`) under the old one.
-const LEGACY_APP_IDENTIFIERS: &[&str] = &[];
+const LEGACY_APP_IDENTIFIERS: &[&str] = &["org.starknet.strkd"];
 
 /// The app-data directory the desktop app uses. Matches Tauri's
 /// `app_data_dir()`: `<platform data dir>/<identifier>`.

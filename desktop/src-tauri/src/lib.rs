@@ -1,4 +1,4 @@
-//! strkd desktop (Tauri 2). Menu-bar companion that hosts the wallet core:
+//! Bramble Companion desktop (Tauri 2). Menu-bar companion that hosts the wallet core:
 //! starts the loopback JSON-RPC service (so agents/apps can call it), surfaces
 //! approval prompts from the service as menu-bar confirmation dialogs, and
 //! exposes IPC commands for the app's own UI (onboarding, unlock, accounts,
@@ -1023,7 +1023,7 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // macOS: run as a regular app so the strkd icon shows in the Dock
+            // macOS: run as a regular app so the Bramble Companion icon shows in the Dock
             // (clicking it re-shows the window — see the Reopen handler in run()).
             // The app still lives in the menu bar via the tray; closing the
             // window only hides it.
@@ -1034,7 +1034,7 @@ pub fn run() {
             // not depend on the webview being awake). The approval bridge posts a
             // banner for every signing request; without permission macOS silently
             // drops them. First launch shows the system prompt; if the user misses
-            // it, they can enable "strkd" under System Settings → Notifications.
+            // it, they can enable "Bramble Companion" under System Settings → Notifications.
             {
                 use tauri_plugin_notification::PermissionState;
                 let n = app.notification();
@@ -1097,7 +1097,7 @@ pub fn run() {
             // If a prover bundle shipped with the app (staged by
             // scripts/stage-prover.sh into resources/prover), point the native
             // backend at it — so a packaged app proves with no external checkout.
-            // Skipped if STRKD_SNIP36_BIN is already set; in dev (no bundle) this
+            // Skipped if BRAMBLE_COMPANION_SNIP36_BIN is already set; in dev (no bundle) this
             // is a no-op and NativeProver falls back to its sibling-checkout
             // default (only consulted when the backend is "native").
             if prover::config::env_var("SNIP36_BIN").is_none() {

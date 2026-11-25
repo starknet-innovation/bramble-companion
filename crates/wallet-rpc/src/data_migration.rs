@@ -13,9 +13,9 @@
 use std::io;
 use std::path::Path;
 
-/// Bundle identifiers earlier versions of the app used, newest first. Empty
-/// until the identifier changes: add the old one here in the same change.
-pub const LEGACY_APP_IDENTIFIERS: &[&str] = &[];
+/// Bundle identifiers earlier versions of the app used, newest first.
+/// `org.starknet.strkd`: every release up to 0.4.0, when the app was called strkd.
+pub const LEGACY_APP_IDENTIFIERS: &[&str] = &["org.starknet.strkd"];
 
 /// Written into a migrated directory, holding the path it was copied from.
 pub const MARKER_FILE: &str = "migrated-from.txt";

@@ -12,8 +12,8 @@
 //! proof storage, only the calling client can poll it, and its result is
 //! dropped an hour after it finishes or when the wallet locks.
 //!
-//! strkd never signs for an owner contract: the virtual transaction carries
-//! the caller's `signature` felts as given. For a strkd account, strkd signs
+//! Bramble Companion never signs for an owner contract: the virtual transaction carries
+//! the caller's `signature` felts as given. For a Bramble Companion account, Bramble Companion signs
 //! the invocation hash with the account's key, as the one-shot methods do.
 
 use serde_json::{json, Value};
@@ -46,7 +46,7 @@ pub const MAX_SIGNATURE_FELTS: usize = 256;
 enum Submit {
     /// Return `{ call, proof }` for the caller to submit.
     None,
-    /// Submit from a strkd account in the caller's scope.
+    /// Submit from a Bramble Companion account in the caller's scope.
     Account,
 }
 
@@ -280,7 +280,7 @@ async fn resolve_now(
     Ok(ctx)
 }
 
-/// The strkd account that submits for `submit: "account"`: `submitter_address`
+/// The Bramble Companion account that submits for `submit: "account"`: `submitter_address`
 /// (in the caller's scope), else the plan's account (an owner's controller).
 async fn resolve_submitter(
     state: &ServerState,
@@ -530,7 +530,7 @@ pub async fn prove(
             ProofInvocation::new(p.pool, p.chain, pool_nonce, p.user, user_sk, &p.actions)
         };
         let signature = match (&meta.subject, signature) {
-            // The caller's felts, verbatim. strkd never signs for an owner.
+            // The caller's felts, verbatim. Bramble Companion never signs for an owner.
             (Subject::Owner(_), Some(sig)) => sig,
             (Subject::Account, None) => session.sign_hash_for(&meta.account, &invocation.hash())?,
             _ => unreachable!("checked above"),

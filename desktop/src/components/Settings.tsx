@@ -19,7 +19,7 @@ const EMPTY_STRK20: Strk20Config = {
   screener_key: "",
 };
 
-/** strkd's self-deployed Sepolia test pool (screener: the public test key 0xCAFEBABE). */
+/** Bramble Companion's self-deployed Sepolia test pool (screener: the public test key 0xCAFEBABE). */
 const SEPOLIA_TEST_POOL = "0x03016a46eec8b164e8a89337c048b5cd1463ea4c4de120b9cb76b3df88646323";
 
 const EMPTY_PROVER: ProverSettings = {

@@ -5,7 +5,7 @@
 //! random value) without signing or proving it, and returns `plan_hash`: the
 //! SNIP-12 digest an owner contract approves on-chain before the proof is built
 //! (`companion_strk20Prove`, [`super::prove`]). Plans work for enrolled owners and
-//! for strkd accounts (§2.1); for an account, strkd signs at prove time.
+//! for Bramble Companion accounts (§2.1); for an account, Bramble Companion signs at prove time.
 //!
 //! Plans live in a [`PlanStore`] held by the unlocked session: in memory only,
 //! bound to the client that made them, capped, expiring, and dropped (with a
@@ -132,7 +132,7 @@ pub(super) struct StoredPlan {
     /// prove it.
     pub(super) client_id: String,
     pub(super) subject: Subject,
-    /// The strkd account whose key derives `user_sk`: the subject itself, or
+    /// The Bramble Companion account whose key derives `user_sk`: the subject itself, or
     /// the owner's controller. It signs at prove time only for an account.
     pub(super) account: AccountRef,
     /// The pool's `user`: the owner or the account address.
@@ -1093,7 +1093,7 @@ mod tests {
         Felt::from_bytes_be_slice(&b)
     }
 
-    /// #66: why `SetViewingKey.random` must never leave strkd. Mirrors the
+    /// #66: why `SetViewingKey.random` must never leave Bramble Companion. Mirrors the
     /// pool's `set_viewing_key` / `encrypt_private_key` (starknet-privacy
     /// 4026da7, `privacy.cairo`, `utils.cairo`) on a test-seed viewing key:
     /// with `random` and the public ciphertext, anyone recovers the key. Then

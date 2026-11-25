@@ -3,7 +3,7 @@
 //!
 //! An owner is a deployed contract that advertises SRC5
 //! `is_custom_signature_valid`, so the pool lets its own logic approve each
-//! spend. strkd holds the owner's viewing key, derived from a controller
+//! spend. Bramble Companion holds the owner's viewing key, derived from a controller
 //! account's key and bound to the owner address (§3.2), and records the
 //! enrolment in the sealed registry. The record holds no secrets; the key is
 //! derived per call, never persisted, logged or returned.

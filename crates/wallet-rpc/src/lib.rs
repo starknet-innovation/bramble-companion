@@ -13,10 +13,11 @@
 
 /// The product's display name. The one place runtime text takes it from; the
 /// desktop bundle's `productName` must match (pinned by a test in `usage.rs`).
-pub const PRODUCT_NAME: &str = "strkd";
+pub const PRODUCT_NAME: &str = "Bramble Companion";
 
 pub mod approval;
 pub mod auth;
+pub mod data_migration;
 pub mod dispatch;
 pub mod error;
 pub mod fee;
@@ -28,7 +29,6 @@ pub mod session;
 pub mod store;
 pub mod strk20;
 pub mod backoff;
-pub mod data_migration;
 pub mod usage;
 
 pub use approval::{

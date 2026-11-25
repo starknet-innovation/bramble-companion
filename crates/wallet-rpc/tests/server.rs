@@ -38,7 +38,7 @@ async fn loopback_server_serves_requests_and_writes_port_lock() {
         Arc::new(AutoApprover(Decision::Approve)),
     ));
 
-    let dir = std::env::temp_dir().join(format!("strkd-test-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("bramble-companion-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let port_lock = dir.join("port.lock");
 

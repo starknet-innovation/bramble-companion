@@ -1,4 +1,4 @@
-//! `strkd` — command-line companion for the strkd menu-bar wallet.
+//! `bramble-companion` — command-line companion for the Bramble Companion menu-bar wallet.
 //!
 //! A thin client over the loopback JSON-RPC service. It holds no keys: signing
 //! and approvals stay in the desktop app, which pops a confirmation for any
@@ -6,7 +6,7 @@
 //! listing, off-chain signing, and invoke transactions.
 //!
 //! Output convention: the requested result is JSON on **stdout**; human
-//! progress notes go to **stderr**, so `strkd accounts | jq` works as-is. See
+//! progress notes go to **stderr**, so `Bramble Companion accounts | jq` works as-is. See
 //! [`Output`] for how `--json` / `--quiet` adjust this.
 
 mod client;
@@ -239,7 +239,7 @@ async fn run(command: Command, out: &Output) -> Result<(), String> {
     Ok(())
 }
 
-/// Load the saved pairing token, or fail with a pointer to `strkd pair`.
+/// Load the saved pairing token, or fail with a pointer to `bramble-companion pair`.
 fn require_token() -> Result<String, String> {
     token::load()
         .map(|p| p.token)
