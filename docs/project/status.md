@@ -12,8 +12,8 @@ _Last updated: 2026-07-06_
 ## ▶ Resume here
 
 **Recommended: run-verify end-to-end now** — the wallet is usable. On a machine
-with a display, set `STRKD_RPC_URL` to a Sepolia RPC endpoint, `cd desktop &&
-npm run tauri dev`, then: onboard → unlock → add account → from a second process
+with a display, `cd desktop && npm run tauri dev`, set a Sepolia RPC URL in the
+Settings tab, then: onboard → unlock → add account → from a second process
 `curl http://127.0.0.1:<port>/` for usage → pair → `companion_requestFunding`
 with `submit:true` and confirm the menu-bar approval + on-chain broadcast. This
 exercises the **node wire format**, which is the one thing not verified by

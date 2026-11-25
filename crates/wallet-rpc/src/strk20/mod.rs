@@ -122,7 +122,7 @@ const KNOWN_PROVER_ERRORS: &[(&str, &str)] = &[
     ("prover port in use", "the prover's local port was in use: retry"),
     (
         "the bundled prover does not support",
-        "the bundled prover does not support this network's Starknet version: update strkd, or use a compatible          remote prover",
+        "the bundled prover does not support this network's Starknet version: update the app, or use a compatible          remote prover",
     ),
     ("prover timed out", "the prover timed out"),
     ("snip36 binary not found", "the on-device prover is not installed (snip36 binary not found)"),

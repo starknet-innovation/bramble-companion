@@ -11,6 +11,7 @@ import { Agents } from "./components/Agents";
 import { Proving } from "./components/Proving";
 import { Privacy } from "./components/Privacy";
 import { ApprovalDialog } from "./components/ApprovalDialog";
+import { PRODUCT_NAME } from "./brand";
 
 type Tab = "accounts" | "private" | "activity" | "agents" | "proving" | "connect" | "settings";
 
@@ -144,7 +145,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">strkd</span>
+        <span className="brand">{PRODUCT_NAME}</span>
         <span className="spacer" />
         {status && (
           <span className="muted small">

@@ -1448,7 +1448,7 @@ fn handle_report_issue(
     params: &Value,
 ) -> Result<Value, WalletRpcError> {
     // goal + needed are the two fields a fix actually needs; the rest mirror the
-    // STRKD-FEEDBACK template and are optional.
+    // COMPANION-FEEDBACK template and are optional.
     let goal = param_str(params, "goal")?;
     let needed = param_str(params, "needed")?;
     if goal.trim().is_empty() || needed.trim().is_empty() {
@@ -1477,9 +1477,9 @@ fn handle_report_issue(
         }
     }
     body.push_str(&format!(
-        "---\n_Filed via strkd `companion_reportIssue` by **{}** ({}). strkd is alpha — \
+        "---\n_Filed via {} `companion_reportIssue` by **{}** ({}). It is alpha — \
 review and edit before submitting, and remove anything sensitive._",
-        client.label, client.id
+        crate::PRODUCT_NAME, client.label, client.id
     ));
     // Keep the prefilled URL within practical browser/server limits (~8 KB once
     // encoded); the operator can add detail in the browser if it's clipped.
@@ -1500,7 +1500,7 @@ review and edit before submitting, and remove anything sensitive._",
         // Make it unambiguous that strkd posted nothing.
         "filed": false,
         "instructions": "Give this `url` to your operator. Opening it loads a prefilled GitHub \
-issue draft; they review, edit, and submit it in their browser. strkd does not file it for you, \
+issue draft; they review, edit, and submit it in their browser. The companion does not file it for you, \
 and stores no GitHub credential."
     }))
 }

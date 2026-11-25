@@ -27,6 +27,8 @@ It holds **no key material**: all signing goes through
 | `dispatch.rs` | `dispatch()` — transport-agnostic request routing, auth, scoping, approval, logging. |
 | `server.rs` | Loopback axum HTTP transport + `port.lock` discovery + transport hardening + `GET /` usage doc. |
 | `usage.rs` | Self-describing usage document served at `GET /` / `GET /usage`. |
+| `data_migration.rs` | `migrate_legacy_data_dir`: one-time copy of the app data from the directory an earlier bundle identifier used (old directory left intact). `LEGACY_APP_IDENTIFIERS` is empty until the identifier changes. |
+| `lib.rs` | `PRODUCT_NAME`: the one constant runtime text takes the product's name from (must match the bundle's `productName`; `desktop/src/brand.ts` is the UI's copy). |
 
 ## Discovery: `GET /` — the complete agent contract
 
@@ -39,7 +41,7 @@ what's rejected, a `concepts` block (accounts/scoping, networks, funding,
 returns/notes, plus the Call shape + accepted aliases), a `deferred` list, and
 **every error code**. It also carries an **`alpha_notice`**: a disclaimer that
 strkd is alpha, plus a call-to-action telling agents **not to work around
-limitations** but to emit a structured `=== STRKD-FEEDBACK ===` block (goal /
+limitations** but to emit a structured `=== COMPANION-FEEDBACK ===` block (goal /
 attempted / observed / limitation / needed / impact / workaround-avoided /
 context) for their operator to relay to the maintainer — so gaps surface as
 actionable reports instead of silent hacks. For operators who can reach the repo,

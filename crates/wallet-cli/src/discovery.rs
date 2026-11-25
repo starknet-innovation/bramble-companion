@@ -13,12 +13,26 @@ use serde_json::Value;
 /// The desktop app's Tauri bundle identifier (see `tauri.conf.json`).
 const APP_IDENTIFIER: &str = "org.starknet.strkd";
 
+/// Identifiers earlier versions of the app used, newest first. Mirrors
+/// `wallet_rpc::data_migration::LEGACY_APP_IDENTIFIERS`: an app that has not
+/// been updated yet still keeps its data (and `port.lock`) under the old one.
+const LEGACY_APP_IDENTIFIERS: &[&str] = &[];
+
 /// The app-data directory the desktop app uses. Matches Tauri's
 /// `app_data_dir()`: `<platform data dir>/<identifier>`.
 pub fn data_dir() -> Result<PathBuf, String> {
     dirs::data_dir()
-        .map(|d| d.join(APP_IDENTIFIER))
+        .map(|d| pick_data_dir(&d, APP_IDENTIFIER, LEGACY_APP_IDENTIFIERS))
         .ok_or_else(|| "could not locate this OS's data directory".to_string())
+}
+
+/// The current directory, unless it is missing and a legacy one exists.
+fn pick_data_dir(base: &std::path::Path, current: &str, legacy: &[&str]) -> PathBuf {
+    let current = base.join(current);
+    if current.exists() {
+        return current;
+    }
+    legacy.iter().map(|id| base.join(id)).find(|d| d.exists()).unwrap_or(current)
 }
 
 /// Read the bound port from `port.lock` and build the loopback service URL.
@@ -29,7 +43,7 @@ pub fn service_url() -> Result<String, String> {
     let path = data_dir()?.join("port.lock");
     let bytes = std::fs::read(&path).map_err(|_| {
         format!(
-            "strkd doesn't look like it's running — no port.lock at {}.\n\
+            "The wallet app doesn't look like it's running — no port.lock at {}.\n\
              Start the menu-bar app, then try again.",
             path.display()
         )
@@ -55,5 +69,18 @@ mod tests {
         let conf: Value =
             serde_json::from_str(include_str!("../../../desktop/src-tauri/tauri.conf.json")).unwrap();
         assert_eq!(conf["identifier"], APP_IDENTIFIER);
+    }
+
+    #[test]
+    fn falls_back_to_a_legacy_dir_only_when_the_current_one_is_missing() {
+        let base = std::env::temp_dir().join(format!("cli-discovery-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (current, legacy) = (base.join("new"), base.join("old"));
+        assert_eq!(pick_data_dir(&base, "new", &["old"]), current);
+        std::fs::create_dir_all(&legacy).unwrap();
+        assert_eq!(pick_data_dir(&base, "new", &["old"]), legacy);
+        std::fs::create_dir_all(&current).unwrap();
+        assert_eq!(pick_data_dir(&base, "new", &["old"]), current);
+        std::fs::remove_dir_all(&base).unwrap();
     }
 }
