@@ -8,6 +8,32 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-23 — One place for the product's name; data-directory migration in place
+
+**Did**
+- Runtime text no longer spells the product's name. Prompts, errors and the
+  usage document say "the companion"; the few places that show the name take it
+  from `wallet_rpc::PRODUCT_NAME` (UI: `desktop/src/brand.ts`), pinned to the
+  bundle's `productName` by a test. The CLI takes its own name from the binary.
+- The feedback block agents emit is now `=== COMPANION-FEEDBACK ===`.
+- `wallet_rpc::data_migration`: copies the app data from the directory an
+  earlier bundle identifier used, leaving the old one intact. The desktop app
+  runs it at startup and the CLI falls back to a legacy directory. Both lists of
+  legacy identifiers are empty, so nothing changes today.
+- Env vars are read through `prover::config::env_var` (a prefix list).
+- Connect tab and `status.md` no longer mention `STRKD_RPC_URL`, which was
+  removed long ago: the RPC URL is set in Settings.
+
+**Why**
+- A change of name or bundle identifier becomes a handful of constants plus
+  comments and docs, with the data migration already tested.
+
+**Frozen, whatever the product is called:** `strkd.strk20.owner.v1` (owner
+viewing-key tag) and `strkd.Strk20Plan` (plan SNIP-12 domain). Changing either
+changes derived keys or breaks deployed owner contracts.
+
+---
+
 ## 2026-11-16 — STRK20: `reveal_actions` never reveals a register batch (#66)
 
 **Did**

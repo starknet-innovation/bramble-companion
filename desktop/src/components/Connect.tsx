@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { type Status } from "../api";
+import { PRODUCT_NAME } from "../brand";
 
 /// Shows the local endpoint and a ready-to-paste prompt that teaches an agent
 /// how to use the wallet (it points the agent at `GET /` for full usage).
@@ -9,7 +10,7 @@ export function Connect({ status }: { status: Status | null }) {
 
   const url = status.service_url;
   const prompt =
-    `You have a local Starknet wallet companion "Bramble Companion" at ${url}.\n` +
+    `You have a local Starknet wallet companion "${PRODUCT_NAME}" at ${url}.\n` +
     `GET ${url}/ for usage and follow it. It manages Starknet accounts and signs ` +
     `transactions on your behalf; every sensitive action asks the human for on-screen ` +
     `approval, and private keys never leave the wallet.\n` +
@@ -46,7 +47,7 @@ export function Connect({ status }: { status: Status | null }) {
       </p>
 
       <div className="prompt-block">
-        <p className="muted small">Copy-paste this prompt for your agent to use Bramble Companion:</p>
+        <p className="muted small">Copy-paste this prompt for your agent to use this wallet:</p>
         <pre className="prompt">{prompt}</pre>
         <button className="primary" onClick={() => void copy()}>
           {copied ? "Copied ✓" : "Copy prompt"}

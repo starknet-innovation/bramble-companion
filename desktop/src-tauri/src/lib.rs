@@ -26,7 +26,9 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tokio::sync::oneshot;
 use zeroize::Zeroizing;
 
-const TRAY_ID: &str = "bramble-companion-tray";
+use wallet_rpc::PRODUCT_NAME;
+
+const TRAY_ID: &str = "main-tray";
 /// The tray icon is derived from the same generated icon as the app/Dock icon
 /// (`tauri icon` regenerates `128x128.png`), so changing `app-icon.png` updates
 /// the menu-bar icon too. The pending "red dot" variant is overlaid at runtime.
@@ -70,23 +72,23 @@ fn refresh_tray(app: &AppHandle, pending: usize) {
         if let Some(tray) = handle.tray_by_id(TRAY_ID) {
             let _ = tray.set_icon(tray_image(pending > 0));
             let tip = if pending > 0 {
-                format!("Bramble Companion — {pending} pending request(s)")
+                format!("{PRODUCT_NAME} — {pending} pending request(s)")
             } else {
-                "Bramble Companion — Starknet wallet companion".to_string()
+                format!("{PRODUCT_NAME} — Starknet wallet companion")
             };
             let _ = tray.set_tooltip(Some(&tip));
         } else {
-            eprintln!("[bramble-companion] refresh_tray: tray '{TRAY_ID}' not found");
+            eprintln!("[desktop] refresh_tray: tray '{TRAY_ID}' not found");
         }
         // Dock-tile badge: visible on the Dock icon regardless of notification perms.
         if let Some(w) = handle.get_webview_window("main") {
             let _ = w.set_badge_count(if pending > 0 { Some(pending as i64) } else { None });
         } else {
-            eprintln!("[bramble-companion] refresh_tray: main window not found");
+            eprintln!("[desktop] refresh_tray: main window not found");
         }
     });
     if let Err(e) = res {
-        eprintln!("[bramble-companion] refresh_tray: run_on_main_thread failed: {e}");
+        eprintln!("[desktop] refresh_tray: run_on_main_thread failed: {e}");
     }
 }
 
@@ -140,12 +142,13 @@ fn show_main(app: &AppHandle) {
 
 /// Banner title for an incoming approval request (pairing and funding are the
 /// ones a user most wants to catch).
-fn notif_title(method: &str) -> &'static str {
-    match method {
-        "companion_requestPairing" => "Bramble Companion — pairing request",
-        "companion_requestFunding" => "Bramble Companion — funding (top-up) request",
-        _ => "Bramble Companion — approval needed",
-    }
+fn notif_title(method: &str) -> String {
+    let what = match method {
+        "companion_requestPairing" => "pairing request",
+        "companion_requestFunding" => "funding (top-up) request",
+        _ => "approval needed",
+    };
+    format!("{PRODUCT_NAME} — {what}")
 }
 
 /// A macOS system sound name (guaranteed audible); a generic name elsewhere.
@@ -251,7 +254,7 @@ async fn unlock(state: State<'_, DesktopState>, passphrase: String) -> Result<()
     }
     opened.map_err(|e| match e {
         wallet_core::CoreError::UnsupportedVaultVersion(found) => format!(
-            "this vault is version {found}; this build of Bramble Companion uses version {}. \
+            "this vault is version {found}; this build uses version {}. \
 Your vault is not damaged and your passphrase is not wrong — this version changed how \
 accounts are derived, so old vaults are deliberately not opened. Start over from your \
 recovery phrase; the old vault file is kept as a backup.",
@@ -1045,25 +1048,31 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|e| format!("no app data dir: {e}"))?;
-            // First launch after the rename from strkd: carry the old data dir
-            // over. A failure stops the launch, since going on would show
-            // onboarding to a user who already has a wallet.
+            // Carry the data over from the directory an earlier bundle identifier
+            // used. Refuse to start rather than open an empty wallet beside it.
             if let Some(parent) = data_dir.parent() {
-                use wallet_rpc::data_migration::{migrate_legacy_data_dir, Migration, LEGACY_APP_IDENTIFIER};
-                let legacy = parent.join(LEGACY_APP_IDENTIFIER);
-                match migrate_legacy_data_dir(&legacy, &data_dir) {
-                    Ok(Migration::Migrated { files }) => eprintln!(
-                        "[bramble-companion] copied {files} file(s) from {} (left in place)",
-                        legacy.display()
-                    ),
-                    Ok(Migration::NotNeeded) => {}
-                    Err(e) => {
-                        return Err(format!(
-                            "could not copy the wallet data from {} to {}: {e}. Nothing was changed in the old folder.",
-                            legacy.display(),
-                            data_dir.display()
-                        )
-                        .into())
+                use wallet_rpc::data_migration::{
+                    migrate_legacy_data_dir, Migration, LEGACY_APP_IDENTIFIERS,
+                };
+                for id in LEGACY_APP_IDENTIFIERS {
+                    let legacy = parent.join(id);
+                    match migrate_legacy_data_dir(&legacy, &data_dir) {
+                        Ok(Migration::Migrated { files }) => {
+                            eprintln!(
+                                "[desktop] copied {files} file(s) from {} (left in place)",
+                                legacy.display()
+                            );
+                            break;
+                        }
+                        Ok(Migration::NotNeeded) => {}
+                        Err(e) => {
+                            return Err(format!(
+                                "could not copy the wallet data from {} to {}: {e}. Nothing was changed in the old folder.",
+                                legacy.display(),
+                                data_dir.display()
+                            )
+                            .into())
+                        }
                     }
                 }
             }
@@ -1186,11 +1195,11 @@ pub fn run() {
             });
 
             // Menu-bar tray.
-            let open = MenuItemBuilder::with_id("open", "Open Bramble Companion").build(app)?;
+            let open = MenuItemBuilder::with_id("open", format!("Open {PRODUCT_NAME}")).build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).items(&[&open, &quit]).build()?;
             let mut tray = TrayIconBuilder::with_id(TRAY_ID)
-                .tooltip("Bramble Companion — Starknet wallet companion")
+                .tooltip(format!("{PRODUCT_NAME} — Starknet wallet companion"))
                 .menu(&menu);
             if let Some(icon) = tray_image(false) {
                 tray = tray.icon(icon);
@@ -1244,7 +1253,7 @@ pub fn run() {
             strk20_check_pool
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Bramble Companion desktop")
+        .expect("error while building the desktop app")
         .run(|_app, _event| {
             // Clicking the Dock icon while the window is hidden re-shows it.
             #[cfg(target_os = "macos")]
