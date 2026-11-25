@@ -129,7 +129,10 @@ async fn usage_endpoint_is_open_and_self_describing() {
     assert_eq!(resp.status().as_u16(), 200);
     let doc: Value = resp.json().await.unwrap();
 
-    assert!(doc["service"].as_str().unwrap().contains("Bramble Companion"));
+    assert!(doc["service"].as_str().unwrap().contains(wallet_rpc::PRODUCT_NAME));
+    let conf: Value =
+        serde_json::from_str(include_str!("../../../desktop/src-tauri/tauri.conf.json")).unwrap();
+    assert_eq!(conf["productName"], wallet_rpc::PRODUCT_NAME, "bundle name and PRODUCT_NAME differ");
     assert!(doc["methods"].is_array());
     assert!(doc["quickstart"].is_array());
     // Core sections the agent contract must carry.

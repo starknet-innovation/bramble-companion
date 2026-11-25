@@ -21,13 +21,14 @@ It holds **no key material**: all signing goes through
 | `approval.rs` | The `Approver` trait + `AutoApprover` (tests) and `ChannelApprover` (real UI). Carries only public info in a prompt. |
 | `session.rs` | `WalletSession`: holds the unlocked mnemonic + vault passphrase + registry (and the in-memory STRK20 plan store, dropped on lock); runs its lock hooks on every lock (`with_prover` adds one that wipes STRK20 proving results); performs deployment-data, typed-data signing, invoke signing, user/agent-account creation, and re-sealing. |
 | `log.rs` | `RequestLog` — SQLite-backed (file or in-memory), with full-payload redaction toggle. |
-| `data_migration.rs` | One-time copy of the data dir from the identifier the app used as strkd (see [`desktop.md`](./desktop.md#upgrading-from-strkd)). |
 | `store.rs` | `VaultStore` — atomic on-disk `vault.bin` load/save (temp + rename, `0600`). |
 | `node.rs` | `StarknetRpc` trait + `HttpStarknetRpc` (reqwest JSON-RPC): nonce, fee estimate, broadcast, deploy-status, deploy-account. |
 | `fee.rs` | Fee bounds (#61): `FeeEstimate` → padded bounds (amount and price padded separately), `fit_bounds_to_balance` (tighten to the payer's STRK balance, or `INSUFFICIENT_BALANCE_FOR_BOUNDS`), `broadcast_error` (names the node's code-55 "exceed balance" refusal). |
 | `dispatch.rs` | `dispatch()` — transport-agnostic request routing, auth, scoping, approval, logging. |
 | `server.rs` | Loopback axum HTTP transport + `port.lock` discovery + transport hardening + `GET /` usage doc. |
 | `usage.rs` | Self-describing usage document served at `GET /` / `GET /usage`. |
+| `data_migration.rs` | `migrate_legacy_data_dir`: one-time copy of the app data from the directory an earlier bundle identifier used (old directory left intact). `LEGACY_APP_IDENTIFIERS` holds `org.starknet.strkd`, the identifier up to 0.4.0 (see [`desktop.md`](./desktop.md#upgrading-from-strkd)). |
+| `lib.rs` | `PRODUCT_NAME`: the one constant runtime text takes the product's name from (must match the bundle's `productName`; `desktop/src/brand.ts` is the UI's copy). |
 
 ## Discovery: `GET /` — the complete agent contract
 

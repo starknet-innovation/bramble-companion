@@ -11,6 +11,10 @@
 // The agent usage doc (`usage.rs`) is one large `json!` literal.
 #![recursion_limit = "256"]
 
+/// The product's display name. The one place runtime text takes it from; the
+/// desktop bundle's `productName` must match (pinned by a test in `usage.rs`).
+pub const PRODUCT_NAME: &str = "Bramble Companion";
+
 pub mod approval;
 pub mod auth;
 pub mod data_migration;

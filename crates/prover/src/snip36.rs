@@ -185,7 +185,7 @@ pub fn classify_prover_error(stderr: &str) -> String {
             raw(stderr)
         )
     } else if low.contains("port") && low.contains("already in use") {
-        format!("prover port in use (stale runner) — retry; Bramble Companion picks a fresh port per prove. raw: {}", raw(stderr))
+        format!("prover port in use (stale runner) — retry; the companion picks a fresh port per prove. raw: {}", raw(stderr))
     } else if low.contains("invalid starknet version") || low.contains("convert block header") {
         format!(
             "the bundled prover does not support this network's Starknet protocol version — it \

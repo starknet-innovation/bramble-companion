@@ -1,10 +1,10 @@
 //! One-time copy of the app's data from the directory an earlier product name
 //! used.
 //!
-//! The data directory is named after the bundle identifier, so renaming the app
-//! (strkd → Bramble Companion) moves it. On the first launch under the new
-//! identifier the desktop app calls [`migrate_legacy_data_dir`], which copies the
-//! old directory across: vault, pairings, settings, request log, prover data and
+//! The data directory is named after the bundle identifier, so changing the
+//! identifier moves it. On the first launch under a new identifier the desktop
+//! app calls [`migrate_legacy_data_dir`] for each of [`LEGACY_APP_IDENTIFIERS`],
+//! which copies the old directory across: vault, pairings, settings, request log, prover data and
 //! `port.lock` (so the service keeps its port and paired clients keep their URL).
 //!
 //! The old directory is never modified or removed. It stays as the backup, and
@@ -13,8 +13,9 @@
 use std::io;
 use std::path::Path;
 
-/// The bundle identifier the app used while it was called strkd.
-pub const LEGACY_APP_IDENTIFIER: &str = "org.starknet.strkd";
+/// Bundle identifiers earlier versions of the app used, newest first.
+/// `org.starknet.strkd`: every release up to 0.4.0, when the app was called strkd.
+pub const LEGACY_APP_IDENTIFIERS: &[&str] = &["org.starknet.strkd"];
 
 /// Written into a migrated directory, holding the path it was copied from.
 pub const MARKER_FILE: &str = "migrated-from.txt";
@@ -103,15 +104,15 @@ mod tests {
     /// A fresh base dir holding `legacy/` (with a vault) and no `current/`.
     fn setup(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
         let base = std::env::temp_dir()
-            .join(format!("bramble-companion-migrate-{tag}-{}", std::process::id()));
+            .join(format!("data-migrate-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
-        let legacy = base.join(LEGACY_APP_IDENTIFIER);
+        let legacy = base.join("org.example.old");
         std::fs::create_dir_all(legacy.join("prover/storage")).unwrap();
         std::fs::write(legacy.join("vault.bin"), b"vault").unwrap();
         std::fs::write(legacy.join("clients.json"), b"{}").unwrap();
         std::fs::write(legacy.join("port.lock"), br#"{"port":4242}"#).unwrap();
         std::fs::write(legacy.join("prover/storage/proof-1"), b"proof").unwrap();
-        let current = base.join("org.starknet.bramble-companion");
+        let current = base.join("org.example.new");
         (base, legacy, current)
     }
 
@@ -178,7 +179,7 @@ mod tests {
     #[test]
     fn rebuilds_a_staging_dir_left_by_a_crash() {
         let (base, legacy, current) = setup("stale");
-        let staging = base.join("org.starknet.bramble-companion.migrating");
+        let staging = base.join("org.example.new.migrating");
         std::fs::create_dir_all(&staging).unwrap();
         std::fs::write(staging.join("half-written"), b"x").unwrap();
         assert!(matches!(

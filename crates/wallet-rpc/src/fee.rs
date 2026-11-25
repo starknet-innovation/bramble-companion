@@ -332,7 +332,7 @@ pub async fn fit_bounds_to_balance(
             };
             Err(WalletRpcError::Precondition(format!(
                 "the paying account's STRK balance can't cover this transaction's fee bounds: estimated fee {} STRK, \
-                 padded max fee {} STRK, tightest bounds Bramble Companion will submit {} STRK, balance {} STRK{spent}. Fund the \
+                 padded max fee {} STRK, tightest bounds the companion will submit {} STRK, balance {} STRK{spent}. Fund the \
                  account with at least {} STRK more, or pass explicit resource_bounds.",
                 strk(estimated),
                 strk(padded_fee),

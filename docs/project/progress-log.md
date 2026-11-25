@@ -8,19 +8,16 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
-## 2026-11-20 — Renamed strkd to Bramble Companion
+## 2026-11-25 — Renamed strkd to Bramble Companion
 
 **Did**
-- Renamed the product in code and living docs: desktop app, bundle identifier
-  (`org.starknet.bramble-companion`), CLI binary and crate (`bramble-companion`),
-  env prefix (`BRAMBLE_COMPANION_`), repository URLs, agent-facing usage text.
-- Added `wallet_rpc::data_migration`: on first launch the app copies the old data
-  dir (`org.starknet.strkd`) to the new one, staged and renamed into place. The
-  old dir is left untouched; a failed copy stops the launch.
-- `STRKD_*` env vars are still read when the new name is unset
-  (`prover::config::env_var`). The CLI falls back to the old data dir when it is
-  the only one present.
-- Renamed the feedback sentinel to `COMPANION-FEEDBACK`.
+- Set the name where the 2026-11-23 groundwork put it: `PRODUCT_NAME` and
+  `desktop/src/brand.ts` are "Bramble Companion", the bundle identifier is
+  `org.starknet.bramble-companion`, and both legacy identifier lists hold
+  `org.starknet.strkd`, which switches the data-directory migration on.
+- Renamed the CLI binary and crate (`bramble-companion`), the desktop crate, the
+  env prefix (`BRAMBLE_COMPANION_`; `STRKD_*` is still read when the new name is
+  unset), the repository URLs, and the name in comments and living docs.
 
 **Decisions**
 - Not renamed, because they are format constants: the STRK20 owner key tag
@@ -32,8 +29,8 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
   `strk20-plan.md`.
 
 **Verify**
-- `cargo test --locked && cargo clippy --locked --all-targets -- -D warnings`
-- `(cd conformance && node verify.mjs && node strk20.mjs)`
+- `./scripts/check.sh`
+- `(cd conformance && npm run verify)`
 - `cargo test -p wallet-rpc data_migration`
 
 **Next / Resume**
@@ -50,6 +47,32 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 - Quit strkd before the first launch of the renamed app (see
   `docs/code/desktop.md` → Upgrading from strkd).
 - The icon and visual identity are unchanged.
+
+---
+
+## 2026-11-23 — One place for the product's name; data-directory migration in place
+
+**Did**
+- Runtime text no longer spells the product's name. Prompts, errors and the
+  usage document say "the companion"; the few places that show the name take it
+  from `wallet_rpc::PRODUCT_NAME` (UI: `desktop/src/brand.ts`), pinned to the
+  bundle's `productName` by a test. The CLI takes its own name from the binary.
+- The feedback block agents emit is now `=== COMPANION-FEEDBACK ===`.
+- `wallet_rpc::data_migration`: copies the app data from the directory an
+  earlier bundle identifier used, leaving the old one intact. The desktop app
+  runs it at startup and the CLI falls back to a legacy directory. Both lists of
+  legacy identifiers are empty, so nothing changes today.
+- Env vars are read through `prover::config::env_var` (a prefix list).
+- Connect tab and `status.md` no longer mention `STRKD_RPC_URL`, which was
+  removed long ago: the RPC URL is set in Settings.
+
+**Why**
+- A change of name or bundle identifier becomes a handful of constants plus
+  comments and docs, with the data migration already tested.
+
+**Frozen, whatever the product is called:** `strkd.strk20.owner.v1` (owner
+viewing-key tag) and `strkd.Strk20Plan` (plan SNIP-12 domain). Changing either
+changes derived keys or breaks deployed owner contracts.
 
 ---
 

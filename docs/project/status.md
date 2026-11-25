@@ -11,15 +11,15 @@ _Last updated: 2026-07-06_
 
 ## ▶ Resume here
 
-**Rename to Bramble Companion (2026-11-20).** The code and living docs are
+**Rename to Bramble Companion (2026-11-25).** The code and living docs are
 renamed; see the newest [progress-log](./progress-log.md) entry for what is left
 before release 0.5.0: the repository rename, a launch over a real 0.4.0 data dir,
 and the attestation check. The rest of this file predates the rename and has not
 been refreshed.
 
 **Recommended: run-verify end-to-end now** — the wallet is usable. On a machine
-with a display, `cd desktop && npm run tauri dev`, set a Sepolia RPC URL in the Settings tab,
-then: onboard → unlock → add account → from a second process
+with a display, `cd desktop && npm run tauri dev`, set a Sepolia RPC URL in the
+Settings tab, then: onboard → unlock → add account → from a second process
 `curl http://127.0.0.1:<port>/` for usage → pair → `companion_requestFunding`
 with `submit:true` and confirm the menu-bar approval + on-chain broadcast. This
 exercises the **node wire format**, which is the one thing not verified by

@@ -291,9 +291,9 @@ export function Settings({ onChange }: { onChange: () => void }) {
                   onChange={(e) => strk20Field(net, "screener_key", e.target.value)}
                 />
                 <p className="muted small">
-                  For a pool you deployed yourself with your own screener key (Bramble Companion's test pool{" "}
+                  For a pool you deployed yourself with your own screener key (the companion's test pool{" "}
                   <code>{SEPOLIA_TEST_POOL.slice(0, 10)}…</code> uses the public test key{" "}
-                  <code>0xCAFEBABE</code>). Deposits are then proved on this device and Bramble Companion signs the
+                  <code>0xCAFEBABE</code>). Deposits are then proved on this device and the companion signs the
                   screening attestation, so nothing leaves the machine.{" "}
                   <strong>
                     Never enter a real screener's key: it is stored unencrypted in this device's

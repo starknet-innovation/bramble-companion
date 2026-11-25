@@ -1477,9 +1477,9 @@ fn handle_report_issue(
         }
     }
     body.push_str(&format!(
-        "---\n_Filed via Bramble Companion `companion_reportIssue` by **{}** ({}). Bramble Companion is alpha — \
+        "---\n_Filed via {} `companion_reportIssue` by **{}** ({}). It is alpha — \
 review and edit before submitting, and remove anything sensitive._",
-        client.label, client.id
+        crate::PRODUCT_NAME, client.label, client.id
     ));
     // Keep the prefilled URL within practical browser/server limits (~8 KB once
     // encoded); the operator can add detail in the browser if it's clipped.
@@ -1500,7 +1500,7 @@ review and edit before submitting, and remove anything sensitive._",
         // Make it unambiguous that Bramble Companion posted nothing.
         "filed": false,
         "instructions": "Give this `url` to your operator. Opening it loads a prefilled GitHub \
-issue draft; they review, edit, and submit it in their browser. Bramble Companion does not file it for you, \
+issue draft; they review, edit, and submit it in their browser. The companion does not file it for you, \
 and stores no GitHub credential."
     }))
 }

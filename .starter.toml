@@ -1,0 +1,5 @@
+# Checks from the repository starter that this project deliberately does not meet.
+[skip]
+pin = "CI and both release workflows build with the stable toolchain; pinning a version changes what releases are built with and needs its own change."
+test-layout = "Idiomatic Cargo layout: each crate keeps its integration tests in crates/<name>/tests/*.rs."
+source-tests = "Idiomatic Rust: unit tests live in #[cfg(test)] modules next to the code they test."
