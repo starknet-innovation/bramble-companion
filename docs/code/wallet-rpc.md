@@ -27,7 +27,7 @@ It holds **no key material**: all signing goes through
 | `dispatch.rs` | `dispatch()` — transport-agnostic request routing, auth, scoping, approval, logging. |
 | `server.rs` | Loopback axum HTTP transport + `port.lock` discovery + transport hardening + `GET /` usage doc. |
 | `usage.rs` | Self-describing usage document served at `GET /` / `GET /usage`. |
-| `data_migration.rs` | `migrate_legacy_data_dir`: one-time copy of the app data from the directory an earlier bundle identifier used (old directory left intact). `LEGACY_APP_IDENTIFIERS` is empty until the identifier changes. |
+| `data_migration.rs` | `migrate_legacy_data_dir`: one-time copy of the app data from the directory an earlier bundle identifier used (old directory left intact). `LEGACY_APP_IDENTIFIERS` holds `org.starknet.strkd`, the identifier up to 0.4.0 (see [`desktop.md`](./desktop.md#upgrading-from-strkd)). |
 | `lib.rs` | `PRODUCT_NAME`: the one constant runtime text takes the product's name from (must match the bundle's `productName`; `desktop/src/brand.ts` is the UI's copy). |
 
 ## Discovery: `GET /` — the complete agent contract
@@ -40,16 +40,16 @@ what's rejected, a `concepts` block (accounts/scoping, networks, funding,
 `quickstart`, the **complete method catalogue** (each with auth/prompts/params/
 returns/notes, plus the Call shape + accepted aliases), a `deferred` list, and
 **every error code**. It also carries an **`alpha_notice`**: a disclaimer that
-strkd is alpha, plus a call-to-action telling agents **not to work around
+Bramble Companion is alpha, plus a call-to-action telling agents **not to work around
 limitations** but to emit a structured `=== COMPANION-FEEDBACK ===` block (goal /
 attempted / observed / limitation / needed / impact / workaround-avoided /
 context) for their operator to relay to the maintainer — so gaps surface as
 actionable reports instead of silent hacks. For operators who can reach the repo,
 `companion_reportIssue` turns those same fields into a **prefilled GitHub
 new-issue link** (`issues/new?title=…&body=…`) the operator opens, reviews, and
-submits in their own browser — strkd files nothing itself and holds no GitHub
+submits in their own browser — Bramble Companion files nothing itself and holds no GitHub
 token, so repo access + human review stay the gate. The target repo defaults to
-`starknet-innovation/strkd` (`ServerState::with_issue_repo` to override). It's **open** (no auth, no transport
+`starknet-innovation/bramble-companion` (`ServerState::with_issue_repo` to override). It's **open** (no auth, no transport
 guard) — public info only — so a client can discover it before pairing.
 `usage.rs` is the single source of truth, and `tests/server.rs` asserts the doc
 lists every implemented method + the core sections (incl. `alpha_notice` and its
@@ -92,7 +92,7 @@ desktop "Connect" tab shows a copy-paste prompt that points agents here (see
 | `companion_strk20RemoveOwner` | paired | **yes** | forget an owner record on the active or given chain's pool → `true` |
 | `companion_strk20Plan` | paired | **yes** (+ **always** for `reveal_actions`, and for an `allow_linkage` plan that opens >1 channel) | plan a STRK20 batch for an owner or an account without signing or proving it (#48) → `{plan_id, plan_version, expires_at, plan_block, plan_hash, actions_hash, typed_data, summary, notes, …}`; `client_actions` only after the separate `reveal_actions` prompt, and never for a register batch (no prompt; `actions_revealed: false`, `reveal_refused: "REVEAL_UNSAFE_FOR_REGISTER"`, #66). `allow_linkage: true` (owners only, else 114 `LINKAGE_OWNERS_ONLY`) lets one batch open several channels, with a disclosure listing the recipients it links and `summary.linkage_allowed: true` (#64). See [`strk20.md`](./strk20.md#external-owners-48) |
 | `companion_strk20DiscardPlan` | paired | no | drop one of the caller's plans → `true`; else `PLAN_NOT_FOUND` |
-| `companion_strk20Prove` | paired | only if the prover changed since the plan, or `submit: "account"` | check and consume a plan, then queue an unrecorded proving job (#48) → `{job_id, status: "queued", block_number, …}`; poll `companion_proveStatus` → `{call, proof, notes}` or `{transaction_hash, submitter_address, call, notes}`. Owners: the caller's `signature` is used verbatim; accounts: strkd signs |
+| `companion_strk20Prove` | paired | only if the prover changed since the plan, or `submit: "account"` | check and consume a plan, then queue an unrecorded proving job (#48) → `{job_id, status: "queued", block_number, …}`; poll `companion_proveStatus` → `{call, proof, notes}` or `{transaction_hash, submitter_address, call, notes}`. Owners: the caller's `signature` is used verbatim; accounts: Bramble Companion signs |
 | `companion_strk20ChannelKey` | paired | **yes (always)** | disclose the key of the subject's outgoing channel to `recipient` (#49) → `{channel_key, sender, recipient, recipient_public_key, marker, pool, chainId, subchannels}`. Reveals every past and future payment on that channel, in every token, irrevocably; cannot spend. A grant never covers it. Refuses the self-channel (`SELF_CHANNEL`) and a missing channel (`CHANNEL_NOT_FOUND`) before prompting. See [`strk20.md`](./strk20.md#note-disclosure-49) |
 | `wallet_strk20Balances` | paired | **yes** | private balance per token, discovered and decrypted locally |
 | `wallet_strk20PrepareInvoke` | paired | **yes** | plan + sign + prove STRK20 actions → `{call, proof, notes}` unsubmitted (`notes`: one locator per transfer note, #49) |
@@ -124,7 +124,7 @@ Still **deferred** (return `-32601`): `addStarknetChain` (arbitrary custom chain
 need a generalized `ChainId` beyond Sepolia/Mainnet) and the `strk20*` privacy
 methods, which are **parked** rather than pending — see
 [`backlog.md`](../project/backlog.md) and
-[issue #20](https://github.com/starknet-innovation/strkd/issues/20).
+[issue #20](https://github.com/starknet-innovation/bramble-companion/issues/20).
 
 ## Node (broadcast & fee estimation)
 
@@ -170,7 +170,7 @@ instead of failing inside the prover ([`strk20.md`](./strk20.md)).
 A V3 transaction pays `amount used × the block's price` per resource; its
 `resource_bounds` are maxima. The node refuses a transaction whose max fee
 (`Σ max_amount × max_price_per_unit`) exceeds the payer's STRK balance (code 55,
-"Resources bounds … exceed balance"). Up to 0.4.0 strkd padded both the amount
+"Resources bounds … exceed balance"). Up to 0.4.0 Bramble Companion padded both the amount
 and the price by 1.5×, so it asked for ~2.25× the estimate in balance (#61).
 `fee.rs` now pads them separately:
 

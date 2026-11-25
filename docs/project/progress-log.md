@@ -8,6 +8,48 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-25 — Renamed strkd to Bramble Companion
+
+**Did**
+- Set the name where the 2026-11-23 groundwork put it: `PRODUCT_NAME` and
+  `desktop/src/brand.ts` are "Bramble Companion", the bundle identifier is
+  `org.starknet.bramble-companion`, and both legacy identifier lists hold
+  `org.starknet.strkd`, which switches the data-directory migration on.
+- Renamed the CLI binary and crate (`bramble-companion`), the desktop crate, the
+  env prefix (`BRAMBLE_COMPANION_`; `STRKD_*` is still read when the new name is
+  unset), the repository URLs, and the name in comments and living docs.
+
+**Decisions**
+- Not renamed, because they are format constants: the STRK20 owner key tag
+  `strkd.strk20.owner.v1` (changing it changes every owner's key) and the SNIP-12
+  domain `strkd.Strk20Plan` (owner contracts hard-code it). Sample domains inside
+  pinned test vectors also keep the old name.
+- Migrate the identifier instead of keeping the old one: installs are few now.
+- Dated records keep the old name: this log, `bramble-convergence.md`,
+  `strk20-plan.md`.
+
+**Verify**
+- `./scripts/check.sh`
+- `(cd conformance && npm run verify)`
+- `cargo test -p wallet-rpc data_migration`
+
+**Next / Resume**
+- Rename the GitHub repository to `bramble-companion` **before** this merges: the
+  code now points at the new URLs (installer, attestations, issue links), and
+  GitHub redirects old → new only.
+- Not yet run: launching the built app over a real 0.4.0 data dir (migration,
+  unlock, an already-paired agent reconnecting). Do it before publishing 0.5.0.
+- Check that attestations on the existing releases still verify under the new
+  repository name.
+- The bramble repo mentions strkd in five files; update them there.
+
+**Notes / caveats**
+- Quit strkd before the first launch of the renamed app (see
+  `docs/code/desktop.md` → Upgrading from strkd).
+- The icon and visual identity are unchanged.
+
+---
+
 ## 2026-11-23 — One place for the product's name; data-directory migration in place
 
 **Did**
