@@ -8,6 +8,25 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-25 — Release 0.5.0 prepared; attestations on older releases
+
+**Did**
+- Bumped the workspace, the desktop crate, `tauri.conf.json` and
+  `desktop/package.json` to 0.5.0, with their lockfiles.
+- The repository is now `starknet-innovation/bramble-companion`.
+- Checked the 0.4.0 attestations (CLI tarball and desktop `.dmg`) after the
+  repository rename: they verify with `-R starknet-innovation/strkd` and fail
+  with `-R starknet-innovation/bramble-companion`, because the signing
+  certificate names the repository as it was at build time. README says so.
+
+**Next / Resume**
+- Before tagging: launch the built app over a real 0.4.0 data dir.
+- `desktop-v0.4.0` is marked Latest, so `releases/latest/download/…-installer.sh`
+  returns 404 today. Publishing `v0.5.0` as Latest (and the desktop release
+  with `--latest=false`) fixes it.
+
+---
+
 ## 2026-11-25 — Renamed strkd to Bramble Companion
 
 **Did**

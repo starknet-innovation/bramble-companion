@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "bramble-companion-desktop"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "image",
  "prover",
@@ -3920,7 +3920,7 @@ dependencies = [
 
 [[package]]
 name = "prover"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "libc",
@@ -5129,7 +5129,7 @@ dependencies = [
 
 [[package]]
 name = "strk20"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "getrandom 0.2.17",
@@ -6094,7 +6094,7 @@ dependencies = [
 
 [[package]]
 name = "wallet-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -6112,7 +6112,7 @@ dependencies = [
 
 [[package]]
 name = "wallet-rpc"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "axum",
