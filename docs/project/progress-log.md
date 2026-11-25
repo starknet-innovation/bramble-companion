@@ -8,6 +8,28 @@ Use the [entry template](#entry-template) at the bottom for every new entry.
 
 ---
 
+## 2026-11-25 — "Experimental" shown in the app and in release notes
+
+**Did**
+- Published 0.5.0 (`v0.5.0` as Latest, `desktop-v0.5.0` not Latest).
+- The app now says "Experimental. Not for real funds." in three places: a tag
+  beside the name in the top bar, the first onboarding screen, and the top of
+  Settings. One string, `EXPERIMENTAL_NOTICE` in `desktop/src/brand.ts`.
+- Both release workflows put the same warning in the release notes. The 0.5.0
+  notes were edited by hand to carry it.
+
+**Why**
+- The tracking card asked to agree how "experimental" is shown under the Bramble
+  name before the rename merged. The rename and 0.5.0 went out with the warning
+  in README only.
+
+**Notes / caveats**
+- The UI change was typechecked and built, not looked at in a running app.
+- The v0.5.0 CLI release has no `dist-manifest.json`: the release job's artifact
+  download missed the manifest it had just uploaded.
+
+---
+
 ## 2026-11-25 — Release 0.5.0 prepared; attestations on older releases
 
 **Did**

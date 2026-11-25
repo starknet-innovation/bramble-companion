@@ -9,6 +9,7 @@ import {
   type Strk20PoolInfo,
 } from "../api";
 import { RevealSeed } from "./RevealSeed";
+import { EXPERIMENTAL_NOTICE } from "../brand";
 
 const EMPTY_STRK20: Strk20Config = {
   pool: "",
@@ -119,6 +120,8 @@ export function Settings({ onChange }: { onChange: () => void }) {
 
   return (
     <div className="panel">
+      <p className="notice-experimental">{EXPERIMENTAL_NOTICE}</p>
+
       <h3>Starknet RPC endpoints</h3>
       <p className="muted small">
         One node per network, shared by the wallet (fee estimation + broadcasting) and the
