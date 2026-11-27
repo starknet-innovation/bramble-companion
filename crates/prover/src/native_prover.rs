@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::prover::{Prover, ProveRequest, ProveResult};
+use crate::prover::{ProveRequest, ProveResult, Prover};
 use crate::settings::SettingsStore;
 use crate::snip36;
 use crate::snip36::run_and_parse;
@@ -34,7 +34,11 @@ use crate::snip36::run_and_parse;
 /// An OS-assigned free TCP port (bind :0, read it back). The window between
 /// release and the runner re-binding is tiny; the CLI also re-checks the port.
 fn free_port() -> Option<u16> {
-    std::net::TcpListener::bind("127.0.0.1:0").ok()?.local_addr().ok().map(|a| a.port())
+    std::net::TcpListener::bind("127.0.0.1:0")
+        .ok()?
+        .local_addr()
+        .ok()
+        .map(|a| a.port())
 }
 
 /// Prefix of the per-prove temp dirs: `bramble-companion-prove-<pid>-<seq>`.
@@ -88,7 +92,9 @@ impl Drop for WorkDir {
 pub fn remove_stale_workdirs(base: &Path) {
     #[cfg(unix)]
     {
-        let Ok(entries) = std::fs::read_dir(base) else { return };
+        let Ok(entries) = std::fs::read_dir(base) else {
+            return;
+        };
         for e in entries.flatten() {
             let name = e.file_name();
             let Some(pid) = name
@@ -161,12 +167,20 @@ impl Prover for NativeProver {
         // resolve even though it runs with cwd = work_dir (to find deps/).
         // Private, and removed when `work` drops: on return, on error, and when
         // this future is dropped (a cancelled job).
-        let work = WorkDir::create(&std::env::temp_dir(), self.seq.fetch_add(1, Ordering::Relaxed))
-            .map_err(|e| format!("workdir: {e}"))?;
+        let work = WorkDir::create(
+            &std::env::temp_dir(),
+            self.seq.fetch_add(1, Ordering::Relaxed),
+        )
+        .map_err(|e| format!("workdir: {e}"))?;
         let dir = work.path().to_path_buf();
         let out_path = dir.join("out.proof");
         let tx_path = work
-            .write_private("tx_a.json", serde_json::to_string(&inp.tx).unwrap_or_default().as_bytes())
+            .write_private(
+                "tx_a.json",
+                serde_json::to_string(&inp.tx)
+                    .unwrap_or_default()
+                    .as_bytes(),
+            )
             .map_err(|e| format!("write tx: {e}"))?;
 
         let mut cmd = tokio::process::Command::new(&self.bin);
@@ -195,7 +209,12 @@ impl Prover for NativeProver {
             cmd.arg("--port").arg(port.to_string());
         }
 
-        let result = run_and_parse(cmd, &dir, &format!("is {} correct?", crate::config::env_name("SNIP36_BIN"))).await;
+        let result = run_and_parse(
+            cmd,
+            &dir,
+            &format!("is {} correct?", crate::config::env_name("SNIP36_BIN")),
+        )
+        .await;
         drop(work);
         result
     }
@@ -216,7 +235,10 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     fn base(tag: &str) -> PathBuf {
-        let b = std::env::temp_dir().join(format!("bramble-companion-native-test-{tag}-{}", std::process::id()));
+        let b = std::env::temp_dir().join(format!(
+            "bramble-companion-native-test-{tag}-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&b);
         std::fs::create_dir_all(&b).unwrap();
         b
@@ -230,7 +252,10 @@ mod tests {
         assert_eq!(mode(w.path()), 0o700);
         let f = w.write_private("tx_a.json", b"{\"secret\":1}").unwrap();
         assert_eq!(mode(&f), 0o600);
-        assert!(w.write_private("tx_a.json", b"x").is_err(), "never reuses an existing file");
+        assert!(
+            w.write_private("tx_a.json", b"x").is_err(),
+            "never reuses an existing file"
+        );
         let dir = w.path().to_path_buf();
         drop(w);
         assert!(!dir.exists());
@@ -246,7 +271,10 @@ mod tests {
         child.wait().unwrap();
         let stale = b.join(format!("{WORKDIR_PREFIX}{dead}-0"));
         let mine = b.join(format!("{WORKDIR_PREFIX}{}-0", std::process::id()));
-        let parent = b.join(format!("{WORKDIR_PREFIX}{}-3", std::os::unix::process::parent_id()));
+        let parent = b.join(format!(
+            "{WORKDIR_PREFIX}{}-3",
+            std::os::unix::process::parent_id()
+        ));
         let other = b.join("bramble-companion-prove-notapid");
         for d in [&stale, &mine, &parent, &other] {
             std::fs::create_dir_all(d).unwrap();

@@ -13,11 +13,11 @@
 
 use serde::{Deserialize, Serialize};
 use wallet_core::{
-    address_hex, deployment_data, sign_declare_v3, sign_deploy_account_v3, sign_hash, sign_invoke_v3,
-    sign_typed_data, strk20_owner_viewing_key, strk20_viewing_key, AccountContract, AccountRef, Call, ChainId, CoreError,
-    DeploymentData, Domain,
-    EncryptedVault,
-    Felt, InvokeV3Params, Registry, SignedDeclare, SignedDeployAccount, SignedInvoke, StarkSignature, Strk20Owner,
+    address_hex, deployment_data, sign_declare_v3, sign_deploy_account_v3, sign_hash,
+    sign_invoke_v3, sign_typed_data, strk20_owner_viewing_key, strk20_viewing_key, AccountContract,
+    AccountRef, Call, ChainId, CoreError, DeploymentData, Domain, EncryptedVault, Felt,
+    InvokeV3Params, Registry, SignedDeclare, SignedDeployAccount, SignedInvoke, StarkSignature,
+    Strk20Owner,
 };
 use zeroize::Zeroizing;
 
@@ -142,7 +142,11 @@ impl WalletSession {
 
     /// Decrypt the vault and enter the unlocked state, retaining the passphrase
     /// for later re-sealing.
-    pub fn unlock(&mut self, vault: &EncryptedVault, vault_passphrase: &str) -> Result<(), CoreError> {
+    pub fn unlock(
+        &mut self,
+        vault: &EncryptedVault,
+        vault_passphrase: &str,
+    ) -> Result<(), CoreError> {
         let plaintext = vault.open(vault_passphrase)?;
         let contents: VaultContents =
             serde_json::from_slice(&plaintext).map_err(|_| CoreError::Serialization)?;
@@ -191,7 +195,10 @@ impl WalletSession {
 
     /// The in-memory STRK20 plan store, if unlocked (#48 §5.4).
     pub(crate) fn strk20_plans(&mut self) -> Result<&mut PlanStore, WalletRpcError> {
-        self.unlocked.as_mut().map(|u| &mut u.strk20_plans).ok_or(WalletRpcError::Locked)
+        self.unlocked
+            .as_mut()
+            .map(|u| &mut u.strk20_plans)
+            .ok_or(WalletRpcError::Locked)
     }
 
     fn require_unlocked(&self) -> Result<&Unlocked, WalletRpcError> {
@@ -207,7 +214,8 @@ impl WalletSession {
             registry: u.registry.clone(),
         };
         let plaintext = Zeroizing::new(
-            serde_json::to_vec(&contents).map_err(|_| WalletRpcError::Unknown("serialize".into()))?,
+            serde_json::to_vec(&contents)
+                .map_err(|_| WalletRpcError::Unknown("serialize".into()))?,
         );
         EncryptedVault::seal(&u.vault_passphrase, &plaintext).map_err(WalletRpcError::from)
     }
@@ -270,8 +278,15 @@ impl WalletSession {
         pool: &Felt,
     ) -> Result<Felt, WalletRpcError> {
         let u = self.require_unlocked()?;
-        strk20_viewing_key(&u.mnemonic, account.domain, account.index, None, &chain.as_felt(), pool)
-            .map_err(WalletRpcError::from)
+        strk20_viewing_key(
+            &u.mnemonic,
+            account.domain,
+            account.index,
+            None,
+            &chain.as_felt(),
+            pool,
+        )
+        .map_err(WalletRpcError::from)
     }
 
     /// The STRK20 viewing key Bramble Companion holds for the external owner contract
@@ -288,8 +303,16 @@ impl WalletSession {
         owner: &Felt,
     ) -> Result<Felt, WalletRpcError> {
         let u = self.require_unlocked()?;
-        strk20_owner_viewing_key(&u.mnemonic, controller.domain, controller.index, None, &chain.as_felt(), pool, owner)
-            .map_err(WalletRpcError::from)
+        strk20_owner_viewing_key(
+            &u.mnemonic,
+            controller.domain,
+            controller.index,
+            None,
+            &chain.as_felt(),
+            pool,
+            owner,
+        )
+        .map_err(WalletRpcError::from)
     }
 
     /// Add a STRK20 owner record to the in-memory registry. Returns false if the
@@ -310,20 +333,30 @@ impl WalletSession {
         client_id: Option<&str>,
     ) -> Result<Option<Strk20Owner>, WalletRpcError> {
         let u = self.unlocked.as_mut().ok_or(WalletRpcError::Locked)?;
-        Ok(u.registry.remove_strk20_owner(owner, chain, pool, client_id))
+        Ok(u.registry
+            .remove_strk20_owner(owner, chain, pool, client_id))
     }
 
     /// Undo [`Self::add_strk20_owner`] when persistence fails.
     pub fn rollback_strk20_owner(&mut self, owner: &Strk20Owner) {
         if let Some(u) = self.unlocked.as_mut() {
-            u.registry.remove_strk20_owner(&owner.owner, owner.chain, &owner.pool, owner.client_id.as_deref());
+            u.registry.remove_strk20_owner(
+                &owner.owner,
+                owner.chain,
+                &owner.pool,
+                owner.client_id.as_deref(),
+            );
         }
     }
 
     /// Sign an already-computed hash with the account's key and serialize the
     /// signature for its account contract. Used for STRK20 proof invocations,
     /// whose V3 hash has the pool as sender (`strk20::invocation`).
-    pub fn sign_hash_for(&self, account: &AccountRef, hash: &Felt) -> Result<Vec<Felt>, WalletRpcError> {
+    pub fn sign_hash_for(
+        &self,
+        account: &AccountRef,
+        hash: &Felt,
+    ) -> Result<Vec<Felt>, WalletRpcError> {
         let u = self.require_unlocked()?;
         let sig = sign_hash(&u.mnemonic, account.domain, account.index, None, hash)
             .map_err(WalletRpcError::from)?;

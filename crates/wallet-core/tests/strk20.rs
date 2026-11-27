@@ -12,7 +12,9 @@
 use krusty_kms::stark_public_key;
 use krusty_kms_common::ChainId;
 use starknet_types_core::felt::Felt;
-use wallet_core::{strk20_owner_viewing_key, strk20_owner_viewing_key_message, strk20_viewing_key, Domain};
+use wallet_core::{
+    strk20_owner_viewing_key, strk20_owner_viewing_key_message, strk20_viewing_key, Domain,
+};
 
 const MNEMONIC: &str =
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -63,13 +65,25 @@ fn viewing_key_is_scoped_to_pool_and_chain() {
         strk20_viewing_key(MNEMONIC, Domain::User, 0, None, &chain.as_felt(), pool).unwrap()
     };
     assert_ne!(vk(ChainId::Sepolia, &pool), vk(ChainId::Mainnet, &pool));
-    assert_ne!(vk(ChainId::Sepolia, &pool), vk(ChainId::Sepolia, &felt(CANONICAL_SEPOLIA_POOL)));
+    assert_ne!(
+        vk(ChainId::Sepolia, &pool),
+        vk(ChainId::Sepolia, &felt(CANONICAL_SEPOLIA_POOL))
+    );
 }
 
 // ── owner viewing keys (#48, design note §3.2) ──────────────────────────────
 
 fn owner_key(index: u32, chain: ChainId, pool: &str, owner: &str) -> Felt {
-    strk20_owner_viewing_key(MNEMONIC, Domain::User, index, None, &chain.as_felt(), &felt(pool), &felt(owner)).unwrap()
+    strk20_owner_viewing_key(
+        MNEMONIC,
+        Domain::User,
+        index,
+        None,
+        &chain.as_felt(),
+        &felt(pool),
+        &felt(owner),
+    )
+    .unwrap()
 }
 
 /// Known-answer vectors for the owner key, from the test seed. The message
@@ -89,11 +103,23 @@ fn owner_viewing_key_known_answers() {
         felt("0x27ce1059691de6da945511c2cbf4dcc5fdd6528065ce13ff5e022802cd22b0d"),
     );
     assert_eq!(
-        stark_public_key(&owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234")).unwrap(),
+        stark_public_key(&owner_key(
+            0,
+            ChainId::Sepolia,
+            CANONICAL_SEPOLIA_POOL,
+            "0x1234"
+        ))
+        .unwrap(),
         felt("0x5b9c157d480682fd660acbbeff3ecd4f6dad0e48b9591a8e2343a56e47488b"),
     );
     assert_eq!(
-        stark_public_key(&owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x5678")).unwrap(),
+        stark_public_key(&owner_key(
+            0,
+            ChainId::Sepolia,
+            CANONICAL_SEPOLIA_POOL,
+            "0x5678"
+        ))
+        .unwrap(),
         felt("0x5bc86f33f5f5de25c5164a6809495f9177bc465655ef548326b481cc9cc1e92"),
     );
 }
@@ -115,19 +141,53 @@ fn owner_viewing_key_is_separate_from_the_controllers_key() {
     let a = owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234");
     assert_ne!(a, own);
     // Even with the controller's own address as the "owner".
-    let controller = wallet_core::oz_address(MNEMONIC, Domain::User, 0, None, ChainId::Sepolia).unwrap();
-    assert_ne!(owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, &format!("{controller:#x}")), own);
-    assert_ne!(a, owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x5678"));
-    assert_ne!(a, owner_key(1, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234"));
+    let controller =
+        wallet_core::oz_address(MNEMONIC, Domain::User, 0, None, ChainId::Sepolia).unwrap();
+    assert_ne!(
+        owner_key(
+            0,
+            ChainId::Sepolia,
+            CANONICAL_SEPOLIA_POOL,
+            &format!("{controller:#x}")
+        ),
+        own
+    );
+    assert_ne!(
+        a,
+        owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x5678")
+    );
+    assert_ne!(
+        a,
+        owner_key(1, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234")
+    );
     assert_ne!(a, owner_key(0, ChainId::Sepolia, TEST_POOL, "0x1234"));
-    assert_ne!(a, owner_key(0, ChainId::Mainnet, CANONICAL_SEPOLIA_POOL, "0x1234"));
-    assert_eq!(a, owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234"), "deterministic");
+    assert_ne!(
+        a,
+        owner_key(0, ChainId::Mainnet, CANONICAL_SEPOLIA_POOL, "0x1234")
+    );
+    assert_eq!(
+        a,
+        owner_key(0, ChainId::Sepolia, CANONICAL_SEPOLIA_POOL, "0x1234"),
+        "deterministic"
+    );
 }
 
 #[test]
 fn owner_viewing_key_refuses_zero_scope() {
     let chain = ChainId::Sepolia.as_felt();
     let pool = felt(TEST_POOL);
-    assert!(strk20_owner_viewing_key(MNEMONIC, Domain::User, 0, None, &chain, &pool, &Felt::ZERO).is_err());
-    assert!(strk20_owner_viewing_key(MNEMONIC, Domain::User, 0, None, &chain, &Felt::ZERO, &felt("0x1")).is_err());
+    assert!(
+        strk20_owner_viewing_key(MNEMONIC, Domain::User, 0, None, &chain, &pool, &Felt::ZERO)
+            .is_err()
+    );
+    assert!(strk20_owner_viewing_key(
+        MNEMONIC,
+        Domain::User,
+        0,
+        None,
+        &chain,
+        &Felt::ZERO,
+        &felt("0x1")
+    )
+    .is_err());
 }

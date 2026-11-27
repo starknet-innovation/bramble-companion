@@ -5,7 +5,8 @@ use wallet_rpc::{ClientKind, ClientStore};
 
 #[test]
 fn pairings_and_grants_persist_across_reopen() {
-    let dir = std::env::temp_dir().join(format!("bramble-companion-clients-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("bramble-companion-clients-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("clients.json");
 
@@ -21,7 +22,9 @@ fn pairings_and_grants_persist_across_reopen() {
     // Reopen (a "restart").
     let reopened = ClientStore::open(path.clone());
     // The agent's existing token still verifies.
-    let client = reopened.verify(&token).expect("token still valid after restart");
+    let client = reopened
+        .verify(&token)
+        .expect("token still valid after restart");
     assert_eq!(client.id, id);
     assert_eq!(client.kind, ClientKind::Agent);
     // The grant survived and is active.
@@ -37,7 +40,8 @@ fn pairings_and_grants_persist_across_reopen() {
 
 #[test]
 fn revoked_grant_persists_as_revoked() {
-    let dir = std::env::temp_dir().join(format!("bramble-companion-clients2-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("bramble-companion-clients2-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("clients.json");
 
@@ -51,7 +55,10 @@ fn revoked_grant_persists_as_revoked() {
 
     let reopened = ClientStore::open(path.clone());
     let client = reopened.verify(&token).unwrap();
-    assert!(!client.grant_active(wallet_rpc::now_unix_ms()), "revoke persisted");
+    assert!(
+        !client.grant_active(wallet_rpc::now_unix_ms()),
+        "revoke persisted"
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

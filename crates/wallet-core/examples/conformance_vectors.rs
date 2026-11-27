@@ -118,7 +118,8 @@ fn main() {
 
     // Invoke V3 transaction hashes: an STRK transfer from user account 0, on
     // both chains, with non-trivial nonce, tip and resource bounds.
-    let strk = Felt::from_hex("0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d").unwrap();
+    let strk = Felt::from_hex("0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d")
+        .unwrap();
     let to = account_address(TEST_MNEMONIC, Domain::User, 1, None, chain, contract).unwrap();
     let calls = vec![Call {
         to: strk,
@@ -128,9 +129,18 @@ fn main() {
     let params = InvokeV3Params {
         nonce: Felt::from(7u64),
         tip: 3,
-        l1_gas: ResourceBounds { max_amount: 0x1000, max_price_per_unit: 0x2540be400 },
-        l2_gas: ResourceBounds { max_amount: 0x5f5e100, max_price_per_unit: 0x3b9aca00 },
-        l1_data_gas: ResourceBounds { max_amount: 0x200, max_price_per_unit: 0x174876e800 },
+        l1_gas: ResourceBounds {
+            max_amount: 0x1000,
+            max_price_per_unit: 0x2540be400,
+        },
+        l2_gas: ResourceBounds {
+            max_amount: 0x5f5e100,
+            max_price_per_unit: 0x3b9aca00,
+        },
+        l1_data_gas: ResourceBounds {
+            max_amount: 0x200,
+            max_price_per_unit: 0x174876e800,
+        },
         ..Default::default()
     };
     let invoke_vectors: Vec<_> = [(ChainId::Sepolia, "SN_SEPOLIA"), (ChainId::Mainnet, "SN_MAIN")]
@@ -158,14 +168,14 @@ fn main() {
     let doc = serde_json::json!({
         "_provenance": {
             "purpose": "Cross-wallet conformance: seed -> public key -> account address. \
-Bramble Companion asserts against this in tests/conformance.rs; bramble can adopt the same file.",
+    Bramble Companion asserts against this in tests/conformance.rs; bramble can adopt the same file.",
             "generated_by": "cargo run --example conformance_vectors (wallet-core)",
             "verified_against": "conformance/verify.mjs (pinned starknet.js + @scure/bip32 + @scure/bip39), run in CI: \
-re-derives every public key from the mnemonic (BIP-32 path -> EIP-2645 grindKey), every address via \
-hash.calculateContractAddressFromHash (exactly the call bramble makes), every SNIP-12 digest via \
-typedData.getMessageHash and every invoke hash via hash.calculateInvokeTransactionHash, independently of krusty.",
+    re-derives every public key from the mnemonic (BIP-32 path -> EIP-2645 grindKey), every address via \
+    hash.calculateContractAddressFromHash (exactly the call bramble makes), every SNIP-12 digest via \
+    typedData.getMessageHash and every invoke hash via hash.calculateInvokeTransactionHash, independently of krusty.",
             "warning": "Regenerating is not verifying. If a value here changes, re-check it against an \
-independent implementation before committing, or this file just asserts Bramble Companion against itself.",
+    independent implementation before committing, or this file just asserts Bramble Companion against itself.",
             "seed": "Published BIP-39 test vector. Never a real seed — see spec §14.",
             "issue": "https://github.com/starknet-innovation/bramble-companion/issues/17"
         },
@@ -178,8 +188,8 @@ independent implementation before committing, or this file just asserts Bramble 
         "typed_data_vectors": typed_vectors,
         "known_divergences": [
             "SNIP-12 rev 1 `i128`: krusty (via starknet-rust-core 0.19.1) accepts only a negative JSON number; \
-it rejects strings (\"-5\", \"5\") and non-negative numbers (5), all of which starknet.js accepts. Bramble Companion refuses \
-to sign such messages (fails closed); when it does sign, the digest matches."
+    it rejects strings (\"-5\", \"5\") and non-negative numbers (5), all of which starknet.js accepts. Bramble Companion refuses \
+    to sign such messages (fails closed); when it does sign, the digest matches."
         ],
         "invoke_v3_vectors": invoke_vectors,
     });

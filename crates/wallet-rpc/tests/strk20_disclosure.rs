@@ -417,8 +417,10 @@ struct Fixture {
 }
 
 fn fixture(tag: &str, node: Arc<FakePool>, reject: &'static [&'static str]) -> Fixture {
-    let dir =
-        std::env::temp_dir().join(format!("bramble-companion-rpc-disclosure-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-disclosure-{tag}-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let pstate = Arc::new(prover::ProverState {
         prover: Arc::new(StubProver),
@@ -738,7 +740,10 @@ async fn channel_key_always_prompts_and_returns_the_pool_derivation() {
     node.set(
         "get_note",
         vec![later],
-        vec![crypto::encrypt_note_value(11, later_salt, ck, strk(), 2), strk()],
+        vec![
+            crypto::encrypt_note_value(11, later_salt, ck, strk(), 2),
+            strk(),
+        ],
     );
     let packed = node.get("get_note", vec![later]).unwrap()[0];
     assert_eq!(
@@ -1237,7 +1242,10 @@ async fn reveal_actions_on_a_transfer_prompts_even_under_a_grant_and_returns_the
     )
     .await);
 
-    assert!(f.approver.prompts(PLAN).is_empty(), "the grant covers the plan");
+    assert!(
+        f.approver.prompts(PLAN).is_empty(),
+        "the grant covers the plan"
+    );
     let reveal = f.approver.prompts(REVEAL);
     assert_eq!(reveal.len(), 1);
     for (i, want) in [
@@ -1260,7 +1268,10 @@ async fn reveal_actions_on_a_transfer_prompts_even_under_a_grant_and_returns_the
     assert_eq!(p["actions_revealed"], json!(true));
     assert!(p.get("reveal_refused").is_none());
     let actions = p["client_actions"].as_array().unwrap();
-    let types: Vec<&str> = actions.iter().map(|a| a["type"].as_str().unwrap()).collect();
+    let types: Vec<&str> = actions
+        .iter()
+        .map(|a| a["type"].as_str().unwrap())
+        .collect();
     assert!(!types.contains(&"set_viewing_key"));
     assert!(types.contains(&"open_channel") && types.contains(&"withdraw"));
     // The new channel's key, as the pool derives it, is in its open_subchannel.
@@ -1270,8 +1281,9 @@ async fn reveal_actions_on_a_transfer_prompts_even_under_a_grant_and_returns_the
         carol(),
         crypto::public_key(Felt::from(0x5eed3_u64)),
     );
-    assert!(actions.iter().any(|a| a["type"] == json!("open_subchannel")
-        && felt_of(&a["channel_key"]) == carol_ck));
+    assert!(actions
+        .iter()
+        .any(|a| a["type"] == json!("open_subchannel") && felt_of(&a["channel_key"]) == carol_ck));
     // actions_hash = poseidon(felts); plan_hash = SNIP-12 of the typed data.
     let felts: Vec<Felt> = p["client_actions_felts"]
         .as_array()
@@ -1279,7 +1291,10 @@ async fn reveal_actions_on_a_transfer_prompts_even_under_a_grant_and_returns_the
         .iter()
         .map(felt_of)
         .collect();
-    assert_eq!(hashes::poseidon_hash_many(&felts), felt_of(&p["actions_hash"]));
+    assert_eq!(
+        hashes::poseidon_hash_many(&felts),
+        felt_of(&p["actions_hash"])
+    );
     let again =
         wallet_rpc::strk20::plan::plan_hash(ChainId::Sepolia, &pool(), &user(), &felts).unwrap();
     assert_eq!(again.plan_hash, felt_of(&p["plan_hash"]));

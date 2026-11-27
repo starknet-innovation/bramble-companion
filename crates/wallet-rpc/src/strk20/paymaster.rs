@@ -54,7 +54,10 @@ impl Paymaster {
             url: url.trim_end_matches('/').to_string(),
             api_key: api_key.to_string(),
             fee_token,
-            http: reqwest::Client::builder().timeout(Duration::from_secs(120)).build().unwrap_or_default(),
+            http: reqwest::Client::builder()
+                .timeout(Duration::from_secs(120))
+                .build()
+                .unwrap_or_default(),
         }
     }
 
@@ -72,11 +75,16 @@ impl Paymaster {
             .send()
             .await
             .map_err(|e| format!("paymaster unreachable: {e}"))?;
-        let v: Value = resp.json().await.map_err(|e| format!("paymaster: bad response: {e}"))?;
+        let v: Value = resp
+            .json()
+            .await
+            .map_err(|e| format!("paymaster: bad response: {e}"))?;
         if let Some(err) = v.get("error") {
             return Err(format!("paymaster refused {method}: {err}"));
         }
-        v.get("result").cloned().ok_or_else(|| format!("paymaster: {method} returned no result"))
+        v.get("result")
+            .cloned()
+            .ok_or_else(|| format!("paymaster: {method} returned no result"))
     }
 
     /// Quote the relay fee for a batch on `pool`, refusing a quote that would
@@ -93,7 +101,12 @@ impl Paymaster {
 
     /// Hand the proven batch to the relay. An error *after* the request left
     /// may mean it was submitted anyway; the message says so.
-    pub async fn execute(&self, call: &wallet_core::Call, proof: &str, proof_facts: &[Felt]) -> Result<Felt, String> {
+    pub async fn execute(
+        &self,
+        call: &wallet_core::Call,
+        proof: &str,
+        proof_facts: &[Felt],
+    ) -> Result<Felt, String> {
         let r = self
             .rpc(
                 "paymaster_executeTransaction",
@@ -116,25 +129,46 @@ impl Paymaster {
     }
 }
 
-pub(crate) fn parse_fee_action(quote: &Value, fee_token: &Felt, user: &Felt) -> Result<FeeAction, String> {
+pub(crate) fn parse_fee_action(
+    quote: &Value,
+    fee_token: &Felt,
+    user: &Felt,
+) -> Result<FeeAction, String> {
     if quote.get("type").and_then(Value::as_str) != Some("apply_action") {
         return Err(format!("unexpected paymaster quote: {quote}"));
     }
-    let fa = quote.get("fee_action").ok_or("the paymaster quote has no fee_action")?;
+    let fa = quote
+        .get("fee_action")
+        .ok_or("the paymaster quote has no fee_action")?;
     if fa.get("type").and_then(Value::as_str) != Some("withdraw") {
         return Err(format!("unexpected paymaster fee action: {fa}"));
     }
-    let felt = |k: &str| fa.get(k).and_then(Value::as_str).and_then(|s| Felt::from_hex(s).ok()).ok_or(format!("fee_action.{k} missing"));
+    let felt = |k: &str| {
+        fa.get(k)
+            .and_then(Value::as_str)
+            .and_then(|s| Felt::from_hex(s).ok())
+            .ok_or(format!("fee_action.{k} missing"))
+    };
     let token = felt("token")?;
     let recipient = felt("recipient")?;
-    let amount = u128::try_from(felt("amount")?).map_err(|_| "fee_action.amount exceeds u128".to_string())?;
+    let amount = u128::try_from(felt("amount")?)
+        .map_err(|_| "fee_action.amount exceeds u128".to_string())?;
     if token != *fee_token {
-        return Err(format!("the paymaster asked for its fee in {token:#x}, not the configured {fee_token:#x}"));
+        return Err(format!(
+            "the paymaster asked for its fee in {token:#x}, not the configured {fee_token:#x}"
+        ));
     }
     if recipient == *user || recipient == Felt::ZERO {
-        return Err("the paymaster's fee recipient is your own address, which would link the batch to you".into());
+        return Err(
+            "the paymaster's fee recipient is your own address, which would link the batch to you"
+                .into(),
+        );
     }
-    Ok(FeeAction { token, amount, recipient })
+    Ok(FeeAction {
+        token,
+        amount,
+        recipient,
+    })
 }
 
 #[cfg(test)]
@@ -148,7 +182,11 @@ mod tests {
         let q = json!({ "type": "apply_action", "fee_action": { "type": "withdraw", "token": "0x4718", "amount": "0x10", "recipient": "0xfee" } });
         assert_eq!(
             parse_fee_action(&q, &Felt::from(STRK), &Felt::from(0xa11ceu64)),
-            Ok(FeeAction { token: Felt::from(STRK), amount: 16, recipient: Felt::from(0xfeeu64) })
+            Ok(FeeAction {
+                token: Felt::from(STRK),
+                amount: 16,
+                recipient: Felt::from(0xfeeu64)
+            })
         );
     }
 

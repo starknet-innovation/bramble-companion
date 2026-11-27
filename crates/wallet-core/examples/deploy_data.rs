@@ -25,5 +25,8 @@ fn main() {
     println!("address={}", address_hex(&d.address));
     println!("class_hash=0x{:x}", d.class_hash);
     println!("salt=0x{:x}", d.salt);
-    println!("constructor_calldata={}", serde_json::to_string(&hexes).unwrap());
+    println!(
+        "constructor_calldata={}",
+        serde_json::to_string(&hexes).unwrap()
+    );
 }

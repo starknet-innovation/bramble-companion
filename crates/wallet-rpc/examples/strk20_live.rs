@@ -47,7 +47,9 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 use wallet_core::{address_hex, oz_address, AccountRef, ChainId, Domain, Registry};
-use wallet_rpc::{dispatch, AutoApprover, Decision, HttpStarknetRpc, Request, ServerState, WalletSession};
+use wallet_rpc::{
+    dispatch, AutoApprover, Decision, HttpStarknetRpc, Request, ServerState, WalletSession,
+};
 
 const MNEMONIC: &str =
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -56,7 +58,11 @@ const TEST_POOL: &str = "0x03016a46eec8b164e8a89337c048b5cd1463ea4c4de120b9cb76b
 const STRK: &str = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
 fn addr_arg(a: &str) -> String {
-    if a.starts_with("0x") { a.to_string() } else { address(a.parse().unwrap()) }
+    if a.starts_with("0x") {
+        a.to_string()
+    } else {
+        address(a.parse().unwrap())
+    }
 }
 
 fn address(i: u32) -> String {
@@ -64,7 +70,10 @@ fn address(i: u32) -> String {
 }
 
 async fn rpc(state: &ServerState, token: Option<&str>, method: &str, params: Value) -> Value {
-    let req: Request = serde_json::from_value(json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params })).unwrap();
+    let req: Request = serde_json::from_value(
+        json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params }),
+    )
+    .unwrap();
     let started = std::time::Instant::now();
     let resp = dispatch(state, token, req).await;
     let v = serde_json::to_value(&resp).unwrap();
@@ -87,31 +96,63 @@ async fn main() {
         });
     }
     let session = WalletSession::new_unlocked(ChainId::Sepolia, MNEMONIC, "live-check", reg);
-    let data_dir = std::env::temp_dir().join(format!("bramble-companion-strk20-live-{}", std::process::id()));
-    let prover = prover::build_prover_state(data_dir.clone(), &prover::ProverConfig { prover_backend: "native".into() });
+    let data_dir = std::env::temp_dir().join(format!(
+        "bramble-companion-strk20-live-{}",
+        std::process::id()
+    ));
+    let prover = prover::build_prover_state(
+        data_dir.clone(),
+        &prover::ProverConfig {
+            prover_backend: "native".into(),
+        },
+    );
     let mut settings = prover.settings.get().await;
     settings.testnet.rpc_url = RPC.into();
-    settings.testnet.strk20.pool = std::env::var("STRK20_POOL").unwrap_or_else(|_| TEST_POOL.into());
+    settings.testnet.strk20.pool =
+        std::env::var("STRK20_POOL").unwrap_or_else(|_| TEST_POOL.into());
     settings.testnet.strk20.avnu_api_key = std::env::var("AVNU_API_KEY").unwrap_or_default();
-    settings.testnet.strk20.deposit_prover_url = std::env::var("DEPOSIT_PROVER_URL").unwrap_or_default();
+    settings.testnet.strk20.deposit_prover_url =
+        std::env::var("DEPOSIT_PROVER_URL").unwrap_or_default();
     settings.testnet.strk20.screener_key = std::env::var("STRK20_SCREENER_KEY").unwrap_or_default();
     prover.settings.update(settings).await.unwrap();
 
-    let mut state = ServerState::new(Arc::new(Mutex::new(session)), Arc::new(AutoApprover(Decision::Approve)))
-        .with_node(ChainId::Sepolia, Arc::new(HttpStarknetRpc::new(RPC)));
+    let mut state = ServerState::new(
+        Arc::new(Mutex::new(session)),
+        Arc::new(AutoApprover(Decision::Approve)),
+    )
+    .with_node(ChainId::Sepolia, Arc::new(HttpStarknetRpc::new(RPC)));
     state.prover = Some(Arc::new(prover));
 
-    let paired = rpc(&state, None, "companion_requestPairing", json!({ "name": "strk20-live", "kind": "app" })).await;
-    let token = paired["result"]["token"].as_str().expect("paired").to_string();
+    let paired = rpc(
+        &state,
+        None,
+        "companion_requestPairing",
+        json!({ "name": "strk20-live", "kind": "app" }),
+    )
+    .await;
+    let token = paired["result"]["token"]
+        .as_str()
+        .expect("paired")
+        .to_string();
     let t = Some(token.as_str());
 
     let out = match args.first().map(String::as_str) {
         Some("balances") => {
             let i: u32 = args[1].parse().unwrap();
-            rpc(&state, t, "wallet_strk20Balances", json!({ "tokens": [STRK], "account_address": address(i) })).await
+            rpc(
+                &state,
+                t,
+                "wallet_strk20Balances",
+                json!({ "tokens": [STRK], "account_address": address(i) }),
+            )
+            .await
         }
         Some("prepare-transfer") => {
-            let (from, to, amount): (u32, u32, u128) = (args[1].parse().unwrap(), args[2].parse().unwrap(), args[3].parse().unwrap());
+            let (from, to, amount): (u32, u32, u128) = (
+                args[1].parse().unwrap(),
+                args[2].parse().unwrap(),
+                args[3].parse().unwrap(),
+            );
             let mut v = rpc(
                 &state,
                 t,
@@ -128,12 +169,22 @@ async fn main() {
         }
         Some("register") => {
             let i: u32 = args[1].parse().unwrap();
-            rpc(&state, t, "companion_strk20Register", json!({ "account_address": address(i) })).await
+            rpc(
+                &state,
+                t,
+                "companion_strk20Register",
+                json!({ "account_address": address(i) }),
+            )
+            .await
         }
         Some("prepare-submit") => {
             // The no-paymaster route: prepare as <from>, submit from <submitter>.
-            let (from, to, amount, by): (u32, String, u128, u32) =
-                (args[1].parse().unwrap(), addr_arg(&args[2]), args[3].parse().unwrap(), args[4].parse().unwrap());
+            let (from, to, amount, by): (u32, String, u128, u32) = (
+                args[1].parse().unwrap(),
+                addr_arg(&args[2]),
+                args[3].parse().unwrap(),
+                args[4].parse().unwrap(),
+            );
             let prepared = rpc(
                 &state,
                 t,
@@ -178,7 +229,11 @@ async fn main() {
                     wallet_core::Call {
                         to: felt(&json!(STRK)),
                         selector: wallet_core::get_selector_from_name("approve"),
-                        calldata: vec![pool, wallet_core::Felt::from(amount), wallet_core::Felt::ZERO],
+                        calldata: vec![
+                            pool,
+                            wallet_core::Felt::from(amount),
+                            wallet_core::Felt::ZERO,
+                        ],
                     },
                     wallet_core::Call {
                         to: pool,
@@ -212,7 +267,13 @@ async fn main() {
         Some("invoke") => {
             let from: u32 = args[1].parse().unwrap();
             let actions: Value = serde_json::from_str(&args[2]).unwrap();
-            rpc(&state, t, "wallet_strk20InvokeTransaction", json!({ "account_address": address(from), "actions": actions })).await
+            rpc(
+                &state,
+                t,
+                "wallet_strk20InvokeTransaction",
+                json!({ "account_address": address(from), "actions": actions }),
+            )
+            .await
         }
         _ => {
             eprintln!("usage: strk20_live balances <i> | prepare-transfer <from> <to> <wei> | invoke <from> <json-actions> | owner-flow <admin> <owner> register|withdraw <wei> <to>|transfer <wei> <to>");
@@ -227,7 +288,13 @@ async fn main() {
 async fn owner_flow(state: &ServerState, t: Option<&str>, args: &[String]) -> Value {
     let admin = address(args[1].parse().unwrap());
     let owner = args[2].clone();
-    let enrol = rpc(state, t, "companion_strk20AddOwner", json!({ "owner_address": owner, "account_address": admin })).await;
+    let enrol = rpc(
+        state,
+        t,
+        "companion_strk20AddOwner",
+        json!({ "owner_address": owner, "account_address": admin }),
+    )
+    .await;
     eprintln!("enrol: {enrol}");
     let mut plan_params = json!({ "owner_address": owner });
     match args[3].as_str() {
@@ -240,9 +307,14 @@ async fn owner_flow(state: &ServerState, t: Option<&str>, args: &[String]) -> Va
         other => panic!("unknown owner-flow intent {other}"),
     }
     let plan = rpc(state, t, "companion_strk20Plan", plan_params).await;
-    let Some(plan_id) = plan["result"]["plan_id"].as_str().map(str::to_string) else { return plan };
+    let Some(plan_id) = plan["result"]["plan_id"].as_str().map(str::to_string) else {
+        return plan;
+    };
     let plan_hash = plan["result"]["plan_hash"].as_str().unwrap().to_string();
-    eprintln!("plan {plan_id}: plan_hash {plan_hash}, summary {}", plan["result"]["summary"]);
+    eprintln!(
+        "plan {plan_id}: plan_hash {plan_hash}, summary {}",
+        plan["result"]["summary"]
+    );
 
     let approve = rpc(
         state,
@@ -252,32 +324,62 @@ async fn owner_flow(state: &ServerState, t: Option<&str>, args: &[String]) -> Va
                 "calls": [{ "contract_address": owner, "entry_point": "approve_plan", "calldata": [plan_hash] }] }),
     )
     .await;
-    let Some(tx) = approve["result"]["transaction_hash"].as_str().map(str::to_string) else { return approve };
+    let Some(tx) = approve["result"]["transaction_hash"]
+        .as_str()
+        .map(str::to_string)
+    else {
+        return approve;
+    };
     eprintln!("approve_plan tx {tx}");
     let node = HttpStarknetRpc::new(RPC);
     let approved_at = loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        let r = wallet_rpc::StarknetRpc::raw(&node, "starknet_getTransactionReceipt", json!({ "transaction_hash": tx })).await;
+        let r = wallet_rpc::StarknetRpc::raw(
+            &node,
+            "starknet_getTransactionReceipt",
+            json!({ "transaction_hash": tx }),
+        )
+        .await;
         if let Some(b) = r.ok().and_then(|r| r["block_number"].as_u64()) {
             break b;
         }
     };
     eprintln!("approved in block {approved_at}; waiting until it is 12 blocks old");
     loop {
-        let head = wallet_rpc::StarknetRpc::raw(&node, "starknet_blockNumber", json!([])).await.ok().and_then(|v| v.as_u64());
+        let head = wallet_rpc::StarknetRpc::raw(&node, "starknet_blockNumber", json!([]))
+            .await
+            .ok()
+            .and_then(|v| v.as_u64());
         if head.is_some_and(|h| h >= approved_at + 12) {
             break;
         }
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
     }
 
-    let proved = rpc(state, t, "companion_strk20Prove", json!({ "plan_id": plan_id, "signature": [], "submit": "account" })).await;
-    let Some(job_id) = proved["result"]["job_id"].as_str().map(str::to_string) else { return proved };
+    let proved = rpc(
+        state,
+        t,
+        "companion_strk20Prove",
+        json!({ "plan_id": plan_id, "signature": [], "submit": "account" }),
+    )
+    .await;
+    let Some(job_id) = proved["result"]["job_id"].as_str().map(str::to_string) else {
+        return proved;
+    };
     eprintln!("prove queued: {proved}");
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        let mut job = rpc(state, t, "companion_proveStatus", json!({ "job_id": job_id })).await;
-        let status = job["result"]["status"].as_str().unwrap_or_default().to_string();
+        let mut job = rpc(
+            state,
+            t,
+            "companion_proveStatus",
+            json!({ "job_id": job_id }),
+        )
+        .await;
+        let status = job["result"]["status"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
         if status == "succeeded" || status == "failed" || job["error"].is_object() {
             if let Some(d) = job.pointer_mut("/result/result/proof/data") {
                 let n = d.as_str().map(str::len).unwrap_or(0);
@@ -293,13 +395,23 @@ async fn channel_key(state: &ServerState, t: Option<&str>, args: &[String]) -> V
     use wallet_core::Felt;
     let from = address(args[1].parse().unwrap());
     let to = addr_arg(&args[2]);
-    let r = rpc(state, t, "companion_strk20ChannelKey", json!({ "account_address": from, "recipient": to })).await;
+    let r = rpc(
+        state,
+        t,
+        "companion_strk20ChannelKey",
+        json!({ "account_address": from, "recipient": to }),
+    )
+    .await;
     let res = r["result"].clone();
     if res.is_null() {
         return r;
     }
     let felt = |v: &Value| Felt::from_hex(v.as_str().unwrap()).unwrap();
-    let (ck, marker, pool) = (felt(&res["channel_key"]), felt(&res["marker"]), felt(&res["pool"]));
+    let (ck, marker, pool) = (
+        felt(&res["channel_key"]),
+        felt(&res["marker"]),
+        felt(&res["pool"]),
+    );
     let node = HttpStarknetRpc::new(RPC);
     let view = |name: &str, calldata: Vec<Felt>| {
         let node = &node;
@@ -307,15 +419,27 @@ async fn channel_key(state: &ServerState, t: Option<&str>, args: &[String]) -> V
                               "entry_point_selector": format!("{:#x}", wallet_core::get_selector_from_name(name)),
                               "calldata": calldata.iter().map(|f| format!("{f:#x}")).collect::<Vec<_>>() });
         async move {
-            let out = wallet_rpc::StarknetRpc::raw(node, "starknet_call", json!({ "request": request, "block_id": "latest" }))
-                .await
-                .unwrap();
-            out.as_array().unwrap().iter().map(|v| Felt::from_hex(v.as_str().unwrap()).unwrap()).collect::<Vec<_>>()
+            let out = wallet_rpc::StarknetRpc::raw(
+                node,
+                "starknet_call",
+                json!({ "request": request, "block_id": "latest" }),
+            )
+            .await
+            .unwrap();
+            out.as_array()
+                .unwrap()
+                .iter()
+                .map(|v| Felt::from_hex(v.as_str().unwrap()).unwrap())
+                .collect::<Vec<_>>()
         }
     };
     // The verifier's own derivation: the marker from the key and the public inputs.
-    let derived =
-        strk20::hashes::channel_marker(ck, felt(&res["sender"]), felt(&res["recipient"]), felt(&res["recipient_public_key"]));
+    let derived = strk20::hashes::channel_marker(
+        ck,
+        felt(&res["sender"]),
+        felt(&res["recipient"]),
+        felt(&res["recipient_public_key"]),
+    );
     let exists = view("channel_exists", vec![marker]).await[0] != Felt::ZERO;
     let mut notes = Vec::new();
     for sub in res["subchannels"].as_array().unwrap() {

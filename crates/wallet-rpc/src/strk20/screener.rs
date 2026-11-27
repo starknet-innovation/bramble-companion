@@ -23,7 +23,8 @@ use crate::node::StarknetRpc;
 
 /// The privacy pool class Bramble Companion is built against (mainnet's canonical pool,
 /// Sepolia's canonical pool and Bramble Companion's Sepolia test pool all run it).
-pub const KNOWN_POOL_CLASS: &str = "0x6d163f2b27df0f53c5b0d019366261ba8034af1bef949dee920a60fe58bcf83";
+pub const KNOWN_POOL_CLASS: &str =
+    "0x6d163f2b27df0f53c5b0d019366261ba8034af1bef949dee920a60fe58bcf83";
 
 fn http_or_empty(name: &str, url: &str) -> Result<(), String> {
     let u = url.trim();
@@ -36,8 +37,10 @@ fn http_or_empty(name: &str, url: &str) -> Result<(), String> {
 
 /// Parse a screener key without ever putting it in an error message.
 fn parse_key(raw: &str) -> Result<Felt, String> {
-    let sk = Felt::from_hex(raw.trim()).map_err(|_| "the STRK20 screener key is not a hex felt".to_string())?;
-    wallet_core::public_key_of_key(&sk).map_err(|_| "the STRK20 screener key is not a valid Stark private key".to_string())?;
+    let sk = Felt::from_hex(raw.trim())
+        .map_err(|_| "the STRK20 screener key is not a hex felt".to_string())?;
+    wallet_core::public_key_of_key(&sk)
+        .map_err(|_| "the STRK20 screener key is not a valid Stark private key".to_string())?;
     Ok(sk)
 }
 
@@ -51,7 +54,10 @@ pub fn validate(cfg: &prover::Strk20Config, chain: ChainId) -> Result<(), String
     http_or_empty("paymaster URL", &cfg.paymaster_url)?;
     if !cfg.screener_key.trim().is_empty() {
         if chain == ChainId::Mainnet {
-            return Err("a local STRK20 screener key is testnet-only: the companion refuses it on mainnet".into());
+            return Err(
+                "a local STRK20 screener key is testnet-only: the companion refuses it on mainnet"
+                    .into(),
+            );
         }
         parse_key(&cfg.screener_key)?;
     }
@@ -59,7 +65,10 @@ pub fn validate(cfg: &prover::Strk20Config, chain: ChainId) -> Result<(), String
 }
 
 /// The local screener key for `chain`, if one is set. Refused on mainnet.
-pub fn local_key(cfg: &prover::Strk20Config, chain: ChainId) -> Result<Option<Felt>, WalletRpcError> {
+pub fn local_key(
+    cfg: &prover::Strk20Config,
+    chain: ChainId,
+) -> Result<Option<Felt>, WalletRpcError> {
     if cfg.screener_key.trim().is_empty() {
         return Ok(None);
     }
@@ -69,21 +78,44 @@ pub fn local_key(cfg: &prover::Strk20Config, chain: ChainId) -> Result<Option<Fe
                 .into(),
         ));
     }
-    parse_key(&cfg.screener_key).map(Some).map_err(|m| WalletRpcError::InvalidRequest(format!("Settings: {m}")))
+    parse_key(&cfg.screener_key)
+        .map(Some)
+        .map_err(|m| WalletRpcError::InvalidRequest(format!("Settings: {m}")))
 }
 
-async fn view(node: &dyn StarknetRpc, pool: &Felt, name: &str, block: Value) -> Result<Felt, String> {
+async fn view(
+    node: &dyn StarknetRpc,
+    pool: &Felt,
+    name: &str,
+    block: Value,
+) -> Result<Felt, String> {
     let request = json!({ "contract_address": format!("{pool:#x}"),
                           "entry_point_selector": format!("{:#x}", get_selector_from_name(name)), "calldata": [] });
-    let out = node.raw("starknet_call", json!({ "request": request, "block_id": block })).await.map_err(|e| format!("{name}: {e}"))?;
-    out.get(0).and_then(Value::as_str).and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| format!("{name}: bad result {out}"))
+    let out = node
+        .raw(
+            "starknet_call",
+            json!({ "request": request, "block_id": block }),
+        )
+        .await
+        .map_err(|e| format!("{name}: {e}"))?;
+    out.get(0)
+        .and_then(Value::as_str)
+        .and_then(|s| Felt::from_hex(s).ok())
+        .ok_or_else(|| format!("{name}: bad result {out}"))
 }
 
 /// Refuse a screener key that is not the pool's: its attestations would revert
 /// with `SCREENING_INVALID_SIGNATURE` after a wasted proof.
-pub async fn check_matches_pool(node: &dyn StarknetRpc, pool: &Felt, sk: &Felt) -> Result<(), WalletRpcError> {
-    let expected = view(node, pool, "get_screener_public_key", json!("latest")).await.map_err(WalletRpcError::Node)?;
-    let ours = wallet_core::public_key_of_key(sk).map_err(|_| WalletRpcError::InvalidRequest("Settings: bad screener key".into()))?;
+pub async fn check_matches_pool(
+    node: &dyn StarknetRpc,
+    pool: &Felt,
+    sk: &Felt,
+) -> Result<(), WalletRpcError> {
+    let expected = view(node, pool, "get_screener_public_key", json!("latest"))
+        .await
+        .map_err(WalletRpcError::Node)?;
+    let ours = wallet_core::public_key_of_key(sk)
+        .map_err(|_| WalletRpcError::InvalidRequest("Settings: bad screener key".into()))?;
     if ours != expected {
         return Err(WalletRpcError::Precondition(format!(
             "the local screener key in Settings → STRK20 is not pool {pool:#x}'s screener (the pool expects public key \
@@ -102,8 +134,17 @@ pub async fn attest(
     depositor: Felt,
     sk: &Felt,
 ) -> Result<strk20::apply::ScreeningAttestation, WalletRpcError> {
-    let block = node.raw("starknet_getBlockWithTxHashes", json!({ "block_id": "latest" })).await.map_err(|e| WalletRpcError::Node(e.to_string()))?;
-    let issued_at = block.get("timestamp").and_then(Value::as_u64).ok_or_else(|| WalletRpcError::Node("latest block: no timestamp".into()))?;
+    let block = node
+        .raw(
+            "starknet_getBlockWithTxHashes",
+            json!({ "block_id": "latest" }),
+        )
+        .await
+        .map_err(|e| WalletRpcError::Node(e.to_string()))?;
+    let issued_at = block
+        .get("timestamp")
+        .and_then(Value::as_u64)
+        .ok_or_else(|| WalletRpcError::Node("latest block: no timestamp".into()))?;
     strk20::screening::attest(sk, chain.as_felt(), depositor, issued_at)
         .map_err(|_| WalletRpcError::Unknown("signing the screening attestation failed".into()))
 }
@@ -111,21 +152,34 @@ pub async fn attest(
 /// What Settings → STRK20 shows about a pool address before it is saved.
 pub async fn pool_info(node: &dyn StarknetRpc, pool: &Felt, screener_key: Option<&Felt>) -> Value {
     let class = node
-        .raw("starknet_getClassHashAt", json!({ "block_id": "latest", "contract_address": format!("{pool:#x}") }))
+        .raw(
+            "starknet_getClassHashAt",
+            json!({ "block_id": "latest", "contract_address": format!("{pool:#x}") }),
+        )
         .await
         .map_err(|e| e.to_string())
-        .and_then(|v| v.as_str().and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| format!("bad class hash {v}")));
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| Felt::from_hex(s).ok())
+                .ok_or_else(|| format!("bad class hash {v}"))
+        });
     let class = match class {
         Ok(c) => c,
         Err(e) if e.to_lowercase().contains("contract not found") || e.contains("\"code\":20") => {
             return json!({ "deployed": false, "warnings": [format!("no contract is deployed at {pool:#x} on this network")] })
         }
-        Err(e) => return json!({ "deployed": null, "warnings": [format!("could not read {pool:#x}: {e}")] }),
+        Err(e) => {
+            return json!({ "deployed": null, "warnings": [format!("could not read {pool:#x}: {e}")] })
+        }
     };
     let known = class == Felt::from_hex(KNOWN_POOL_CLASS).expect("constant felt");
-    let screener = view(node, pool, "get_screener_public_key", json!("latest")).await.ok();
+    let screener = view(node, pool, "get_screener_public_key", json!("latest"))
+        .await
+        .ok();
     let version = view(node, pool, "get_version", json!("latest")).await.ok();
-    let fee = view(node, pool, "get_fee_amount", json!("latest")).await.ok();
+    let fee = view(node, pool, "get_fee_amount", json!("latest"))
+        .await
+        .ok();
     let mut warnings = Vec::new();
     if !known {
         warnings.push(format!(
@@ -137,9 +191,13 @@ pub async fn pool_info(node: &dyn StarknetRpc, pool: &Felt, screener_key: Option
     }
     let screener_matches = match (screener_key, screener) {
         (Some(sk), Some(expected)) => {
-            let ok = wallet_core::public_key_of_key(sk).map(|pk| pk == expected).unwrap_or(false);
+            let ok = wallet_core::public_key_of_key(sk)
+                .map(|pk| pk == expected)
+                .unwrap_or(false);
             if !ok {
-                warnings.push("the screener key does not match this pool's screener public key".to_string());
+                warnings.push(
+                    "the screener key does not match this pool's screener public key".to_string(),
+                );
             }
             Some(ok)
         }
@@ -165,14 +223,25 @@ mod tests {
     const TEST_SCREENER: &str = "0xCAFEBABE";
 
     fn cfg(screener_key: &str) -> prover::Strk20Config {
-        prover::Strk20Config { screener_key: screener_key.into(), ..Default::default() }
+        prover::Strk20Config {
+            screener_key: screener_key.into(),
+            ..Default::default()
+        }
     }
 
     #[test]
     fn local_key_is_refused_on_mainnet() {
-        assert!(matches!(local_key(&cfg(TEST_SCREENER), ChainId::Mainnet), Err(WalletRpcError::Precondition(_))));
-        assert!(validate(&cfg(TEST_SCREENER), ChainId::Mainnet).unwrap_err().contains("testnet-only"));
-        assert_eq!(local_key(&cfg(TEST_SCREENER), ChainId::Sepolia).unwrap(), Some(Felt::from(0xCAFEBABEu64)));
+        assert!(matches!(
+            local_key(&cfg(TEST_SCREENER), ChainId::Mainnet),
+            Err(WalletRpcError::Precondition(_))
+        ));
+        assert!(validate(&cfg(TEST_SCREENER), ChainId::Mainnet)
+            .unwrap_err()
+            .contains("testnet-only"));
+        assert_eq!(
+            local_key(&cfg(TEST_SCREENER), ChainId::Sepolia).unwrap(),
+            Some(Felt::from(0xCAFEBABEu64))
+        );
         assert_eq!(local_key(&cfg(""), ChainId::Mainnet).unwrap(), None);
         assert!(validate(&cfg(TEST_SCREENER), ChainId::Sepolia).is_ok());
     }
@@ -182,7 +251,9 @@ mod tests {
         for bad in ["0xnot-a-felt-cafe", "0x0"] {
             let e = validate(&cfg(bad), ChainId::Sepolia).unwrap_err();
             assert!(!e.contains(bad), "{e}");
-            let e = local_key(&cfg(bad), ChainId::Sepolia).unwrap_err().message();
+            let e = local_key(&cfg(bad), ChainId::Sepolia)
+                .unwrap_err()
+                .message();
             assert!(!e.contains(bad), "{e}");
         }
     }

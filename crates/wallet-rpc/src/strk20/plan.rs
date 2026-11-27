@@ -790,7 +790,11 @@ pub async fn plan(
         .count();
     // Decided before the plan moves into the store: a register batch is never
     // revealed, so its reveal prompt is never shown.
-    let reveal_refused = if reveal { reveal_refusal(&plan.actions) } else { None };
+    let reveal_refused = if reveal {
+        reveal_refusal(&plan.actions)
+    } else {
+        None
+    };
     let mut out = json!({
         "plan_id": id,
         "plan_version": PLAN_VERSION,
@@ -1055,7 +1059,13 @@ mod tests {
         // Another client is neither blocked nor told about c1's plan.
         s.insert(stored("y", "c2", 1, u64::MAX), 0).unwrap();
         let e = s.insert(stored("y2", "c2", 1, u64::MAX), 0).unwrap_err();
-        assert!(e.message().contains("your plan y:") && !e.message().contains("\"a\"") && !e.message().contains(" a:"), "{}", e.message());
+        assert!(
+            e.message().contains("your plan y:")
+                && !e.message().contains("\"a\"")
+                && !e.message().contains(" a:"),
+            "{}",
+            e.message()
+        );
         assert!(s.take("y", "c2", 0).is_ok());
         for i in 2..=4 {
             s.insert(stored(&format!("a{i}"), "c1", i, u64::MAX), 0)
@@ -1100,7 +1110,8 @@ mod tests {
     /// the reveal view refuses the batch and never carries `random`.
     #[test]
     fn set_viewing_key_random_recovers_the_viewing_key_so_it_is_never_revealed() {
-        const TEST_MNEMONIC: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
+        const TEST_MNEMONIC: &str =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon \
                                      abandon abandon about";
         let pool = f("0x123");
         let sk = wallet_core::strk20_viewing_key(
@@ -1132,7 +1143,10 @@ mod tests {
             - strk20::hashes::enc_private_key_hash(
                 strk20::crypto::shared_x(random, auditor_pk).unwrap(),
             );
-        assert!(by_random_holder == sk, "random must recover the viewing key");
+        assert!(
+            by_random_holder == sk,
+            "random must recover the viewing key"
+        );
 
         // A register batch: SetViewingKey, then the self-channel.
         let actions = vec![

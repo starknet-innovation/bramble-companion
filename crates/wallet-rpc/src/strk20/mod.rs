@@ -42,13 +42,16 @@ use serde_json::{json, Value};
 use strk20::discovery::{self, PoolReader};
 use strk20::invocation::ProofInvocation;
 use strk20::planner::{self, Intent, NoteLocator, OsRandomness, Plan, State, Warning};
-use wallet_core::{address_hex, get_selector_from_name, AccountRef, Call, ChainId, Felt, InvokeV3Params, Strk20Owner};
+use wallet_core::{
+    address_hex, get_selector_from_name, AccountRef, Call, ChainId, Felt, InvokeV3Params,
+    Strk20Owner,
+};
 
 use crate::approval::{ApprovalRequest, Decision};
 use crate::auth::PairedClient;
 use crate::dispatch::{
-    chain_name, gated_approval, normalize_address, opt_param_str, prover_network, prover_or_err, resolve_chain,
-    scope_for, ServerState,
+    chain_name, gated_approval, normalize_address, opt_param_str, prover_network, prover_or_err,
+    resolve_chain, scope_for, ServerState,
 };
 use crate::error::WalletRpcError;
 use crate::node::{NodeError, StarknetRpc};
@@ -84,8 +87,11 @@ fn pool_revert(e: &str) -> Option<String> {
     let start = e.find("('")? + 2;
     let end = start + e[start..].find("')")?;
     let reason = &e[start..end];
-    (!reason.is_empty() && reason.bytes().all(|b| b.is_ascii_uppercase() || b == b'_' || b.is_ascii_digit()))
-        .then(|| reason.to_string())
+    (!reason.is_empty()
+        && reason
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b == b'_' || b.is_ascii_digit()))
+    .then(|| reason.to_string())
 }
 
 /// Remove the viewing key from text that leaves the handler (errors are returned
@@ -95,7 +101,9 @@ fn scrub(text: &str, user_sk: Felt) -> String {
     let hex = format!("{user_sk:#x}");
     let padded = format!("0x{user_sk:064x}");
     let decimal = user_sk.to_string();
-    text.replace(&padded, "<viewing key>").replace(&hex, "<viewing key>").replace(&decimal, "<viewing key>")
+    text.replace(&padded, "<viewing key>")
+        .replace(&hex, "<viewing key>")
+        .replace(&decimal, "<viewing key>")
 }
 
 /// `INVALID_SIGNATURE` as a Cairo short string, as a prover revert trace
@@ -165,10 +173,17 @@ fn safe_prover_error(err: &str, owner: bool, block: u64) -> (&'static str, Strin
         } else {
             "the account's signature was not accepted".to_string()
         };
-        let reason = if owner { "OWNER_SIGNATURE_REJECTED" } else { "INVALID_SIGNATURE" };
+        let reason = if owner {
+            "OWNER_SIGNATURE_REJECTED"
+        } else {
+            "INVALID_SIGNATURE"
+        };
         return (reason, format!("the pool's signature check failed (INVALID_SIGNATURE) when the prover executed the batch: {why}"));
     }
-    let what = KNOWN_PROVER_ERRORS.iter().find(|(prefix, _)| err.starts_with(prefix)).map_or("proving failed", |(_, m)| m);
+    let what = KNOWN_PROVER_ERRORS
+        .iter()
+        .find(|(prefix, _)| err.starts_with(prefix))
+        .map_or("proving failed", |(_, m)| m);
     (
         "PROVING_FAILED",
         format!("{what}. The prover's own output is withheld: the contracts it runs can put secrets in it."),
@@ -182,7 +197,11 @@ async fn prover_identity(prover: &prover::ProverState, chain: ChainId) -> String
     if kind != "remote" {
         return kind.to_string();
     }
-    let url = prover.settings.for_network(prover_network(chain)).await.prover_url;
+    let url = prover
+        .settings
+        .for_network(prover_network(chain))
+        .await
+        .prover_url;
     if url.is_empty() {
         "remote (no URL set)".to_string()
     } else {
@@ -226,32 +245,46 @@ impl PoolReader for NodeReader {
                               "calldata": calldata.iter().map(hex).collect::<Vec<_>>() });
         let out = self
             .node
-            .raw("starknet_call", json!({ "request": request, "block_id": self.block }))
+            .raw(
+                "starknet_call",
+                json!({ "request": request, "block_id": self.block }),
+            )
             .await
             .map_err(|e| strk20::Error::Read(e.to_string()))?;
         out.as_array()
             .ok_or_else(|| strk20::Error::Read("starknet_call: not an array".into()))?
             .iter()
-            .map(|v| v.as_str().and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| strk20::Error::Read(format!("bad felt {v}"))))
+            .map(|v| {
+                v.as_str()
+                    .and_then(|s| Felt::from_hex(s).ok())
+                    .ok_or_else(|| strk20::Error::Read(format!("bad felt {v}")))
+            })
             .collect()
     }
 }
 
 async fn block_number(node: &dyn StarknetRpc) -> Result<u64, WalletRpcError> {
-    node.raw("starknet_blockNumber", json!([])).await.map_err(node_err)?.as_u64().ok_or_else(|| node_err("blockNumber: not a number"))
+    node.raw("starknet_blockNumber", json!([]))
+        .await
+        .map_err(node_err)?
+        .as_u64()
+        .ok_or_else(|| node_err("blockNumber: not a number"))
 }
 
 /// Whether a node error is JSON-RPC `CONTRACT_NOT_FOUND` (code 20).
 fn is_contract_not_found(e: &NodeError) -> bool {
     let NodeError::Rpc(m) = e else { return false };
-    let code = serde_json::from_str::<Value>(m).ok().and_then(|v| v.get("code").and_then(Value::as_i64));
+    let code = serde_json::from_str::<Value>(m)
+        .ok()
+        .and_then(|v| v.get("code").and_then(Value::as_i64));
     code == Some(20) || (code.is_none() && m.to_lowercase().contains("contract not found"))
 }
 
 /// Refuse to prove for an account (or owner contract) that has no contract at
 /// `block`, the proving block, with an error that says why and when to retry.
 async fn ensure_deployed_at(ctx: &Ctx, block: u64) -> Result<(), WalletRpcError> {
-    let params = json!({ "block_id": { "block_number": block }, "contract_address": hex(&ctx.user) });
+    let params =
+        json!({ "block_id": { "block_number": block }, "contract_address": hex(&ctx.user) });
     match ctx.node.raw("starknet_getClassHashAt", params).await {
         Ok(_) => Ok(()),
         Err(e) if is_contract_not_found(&e) => {
@@ -298,7 +331,12 @@ pub enum Caller<'a> {
 }
 
 impl Caller<'_> {
-    async fn approve(self, state: &ServerState, method: &str, summary: String) -> Result<(), WalletRpcError> {
+    async fn approve(
+        self,
+        state: &ServerState,
+        method: &str,
+        summary: String,
+    ) -> Result<(), WalletRpcError> {
         match self {
             Caller::Desktop => Ok(()),
             Caller::Rpc(client) => match gated_approval(state, client, method, summary).await {
@@ -310,7 +348,12 @@ impl Caller<'_> {
 
     /// Like [`Self::approve`], but an active grant never covers it: an RPC
     /// caller always gets a prompt (enrolment, D6; like `companion_requestGrant`).
-    async fn approve_always(self, state: &ServerState, method: &str, summary: String) -> Result<(), WalletRpcError> {
+    async fn approve_always(
+        self,
+        state: &ServerState,
+        method: &str,
+        summary: String,
+    ) -> Result<(), WalletRpcError> {
         match self {
             Caller::Desktop => Ok(()),
             Caller::Rpc(client) => {
@@ -366,12 +409,16 @@ pub fn pool_for(cfg: &prover::Strk20Config, chain: ChainId) -> Result<Felt, Wall
             ChainId::Mainnet => MAINNET_POOL,
             ChainId::Sepolia => SEPOLIA_POOL,
         })),
-        p => Felt::from_hex(p).map_err(|_| invalid(format!("Settings: STRK20 pool {p} is not a felt"))),
+        p => Felt::from_hex(p)
+            .map_err(|_| invalid(format!("Settings: STRK20 pool {p} is not a felt"))),
     }
 }
 
 /// The chain a request targets, its STRK20 settings and pool.
-async fn chain_and_pool(state: &ServerState, params: &Value) -> Result<(ChainId, prover::Strk20Config, Felt), WalletRpcError> {
+async fn chain_and_pool(
+    state: &ServerState,
+    params: &Value,
+) -> Result<(ChainId, prover::Strk20Config, Felt), WalletRpcError> {
     let chain = resolve_chain(state, params).await?;
     let cfg = match &state.prover {
         Some(p) => p.settings.for_network(prover_network(chain)).await.strk20,
@@ -396,8 +443,12 @@ fn address_param(params: &Value, key: &str) -> Result<Option<String>, WalletRpcE
     match params.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(v) => {
-            let f = v.as_str().and_then(|s| Felt::from_hex(s).ok()).filter(|f| *f != Felt::ZERO);
-            f.map(|f| Some(address_hex(&f))).ok_or_else(|| invalid(format!("{key}: expected a non-zero address")))
+            let f = v
+                .as_str()
+                .and_then(|s| Felt::from_hex(s).ok())
+                .filter(|f| *f != Felt::ZERO);
+            f.map(|f| Some(address_hex(&f)))
+                .ok_or_else(|| invalid(format!("{key}: expected a non-zero address")))
         }
     }
 }
@@ -410,7 +461,11 @@ fn not_enrolled() -> WalletRpcError {
 /// Resolve the subject of a STRK20 call: `account_address` (default: the
 /// caller's first scoped account) or `owner_address`, an owner the caller
 /// enrolled on this chain and pool. Passing both is a 114.
-async fn ctx(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<Ctx, WalletRpcError> {
+async fn ctx(
+    state: &ServerState,
+    caller: Caller<'_>,
+    params: &Value,
+) -> Result<Ctx, WalletRpcError> {
     let owner = address_param(params, "owner_address")?;
     if owner.is_some() && params.get("account_address").is_some_and(|v| !v.is_null()) {
         return Err(invalid(
@@ -428,7 +483,10 @@ async fn ctx(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<
                 let account = match opt_param_str(params, "account_address") {
                     Some(a) => {
                         let want = normalize_address(&a)?;
-                        scoped.find(|acc| acc.address == want).cloned().ok_or(WalletRpcError::Forbidden)?
+                        scoped
+                            .find(|acc| acc.address == want)
+                            .cloned()
+                            .ok_or(WalletRpcError::Forbidden)?
                     }
                     None => scoped.next().cloned().ok_or(WalletRpcError::Forbidden)?,
                 };
@@ -454,14 +512,27 @@ async fn ctx(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<
         Subject::Account => &account.address,
         Subject::Owner(o) => &o.owner,
     };
-    let user = Felt::from_hex(user).map_err(|_| WalletRpcError::Unknown("bad stored address".into()))?;
+    let user =
+        Felt::from_hex(user).map_err(|_| WalletRpcError::Unknown("bad stored address".into()))?;
     let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
-    Ok(Ctx { account, subject, user, chain, pool, node, cfg })
+    Ok(Ctx {
+        account,
+        subject,
+        user,
+        chain,
+        pool,
+        node,
+        cfg,
+    })
 }
 
 impl Ctx {
     fn reader(&self, block: Value) -> NodeReader {
-        NodeReader { node: self.node.clone(), pool: self.pool, block }
+        NodeReader {
+            node: self.node.clone(),
+            pool: self.pool,
+            block,
+        }
     }
 
     /// The subject's address, as [`address_hex`].
@@ -485,8 +556,15 @@ impl Ctx {
     async fn viewing_key(&self, state: &ServerState) -> Result<Felt, WalletRpcError> {
         let session = state.session.lock().await;
         match &self.subject {
-            Subject::Account => session.strk20_viewing_key_for(&self.account, self.chain, &self.pool),
-            Subject::Owner(_) => session.strk20_owner_viewing_key_for(&self.account, self.chain, &self.pool, &self.user),
+            Subject::Account => {
+                session.strk20_viewing_key_for(&self.account, self.chain, &self.pool)
+            }
+            Subject::Owner(_) => session.strk20_owner_viewing_key_for(
+                &self.account,
+                self.chain,
+                &self.pool,
+                &self.user,
+            ),
         }
     }
 
@@ -495,7 +573,10 @@ impl Ctx {
         if pool_for(&prover::Strk20Config::default(), self.chain).ok() == Some(self.pool) {
             format!("pool {:#x}", self.pool)
         } else {
-            format!("NON-CANONICAL pool {:#x}, set in Settings → STRK20", self.pool)
+            format!(
+                "NON-CANONICAL pool {:#x}, set in Settings → STRK20",
+                self.pool
+            )
         }
     }
 }
@@ -504,18 +585,34 @@ impl Ctx {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    Deposit { token: Felt, amount: u128 },
-    Withdraw { token: Felt, amount: u128, recipient: Felt },
-    Transfer { token: Felt, amount: u128, recipient: Felt },
+    Deposit {
+        token: Felt,
+        amount: u128,
+    },
+    Withdraw {
+        token: Felt,
+        amount: u128,
+        recipient: Felt,
+    },
+    Transfer {
+        token: Felt,
+        amount: u128,
+        recipient: Felt,
+    },
 }
 
 fn field_felt(a: &Value, k: &str) -> Result<Felt, WalletRpcError> {
-    a.get(k).and_then(Value::as_str).and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| invalid(format!("action.{k}: expected a felt")))
+    a.get(k)
+        .and_then(Value::as_str)
+        .and_then(|s| Felt::from_hex(s).ok())
+        .ok_or_else(|| invalid(format!("action.{k}: expected a felt")))
 }
 
 fn field_amount(a: &Value) -> Result<u128, WalletRpcError> {
     if a.get("amount").and_then(Value::as_str) == Some("OPEN") {
-        return Err(WalletRpcError::NotImplemented("open notes (transfer amount \"OPEN\") are not supported yet".into()));
+        return Err(WalletRpcError::NotImplemented(
+            "open notes (transfer amount \"OPEN\") are not supported yet".into(),
+        ));
     }
     let f = field_felt(a, "amount")?;
     let n = u128::try_from(f).map_err(|_| invalid("action.amount exceeds u128"))?;
@@ -526,19 +623,37 @@ fn field_amount(a: &Value) -> Result<u128, WalletRpcError> {
 }
 
 pub fn parse_actions(params: &Value) -> Result<Vec<Action>, WalletRpcError> {
-    let list = params.get("actions").and_then(Value::as_array).ok_or_else(|| invalid("missing array param 'actions'"))?;
+    let list = params
+        .get("actions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("missing array param 'actions'"))?;
     if list.is_empty() || list.len() > MAX_ACTIONS {
-        return Err(invalid(format!("actions: between 1 and {MAX_ACTIONS} required")));
+        return Err(invalid(format!(
+            "actions: between 1 and {MAX_ACTIONS} required"
+        )));
     }
     list.iter()
         .map(|a| {
             let token = || field_felt(a, "token");
             match a.get("type").and_then(Value::as_str) {
-                Some("deposit") => Ok(Action::Deposit { token: token()?, amount: field_amount(a)? }),
-                Some("withdraw") => Ok(Action::Withdraw { token: token()?, amount: field_amount(a)?, recipient: field_felt(a, "recipient")? }),
-                Some("transfer") => Ok(Action::Transfer { token: token()?, amount: field_amount(a)?, recipient: field_felt(a, "recipient")? }),
+                Some("deposit") => Ok(Action::Deposit {
+                    token: token()?,
+                    amount: field_amount(a)?,
+                }),
+                Some("withdraw") => Ok(Action::Withdraw {
+                    token: token()?,
+                    amount: field_amount(a)?,
+                    recipient: field_felt(a, "recipient")?,
+                }),
+                Some("transfer") => Ok(Action::Transfer {
+                    token: token()?,
+                    amount: field_amount(a)?,
+                    recipient: field_felt(a, "recipient")?,
+                }),
                 Some(t @ ("invoke" | "shadow_account_invoke" | "subaccount_invoke")) => {
-                    Err(WalletRpcError::NotImplemented(format!("STRK20 `{t}` actions are not supported yet")))
+                    Err(WalletRpcError::NotImplemented(format!(
+                        "STRK20 `{t}` actions are not supported yet"
+                    )))
                 }
                 _ => Err(invalid(format!("unknown STRK20 action {a}"))),
             }
@@ -551,8 +666,16 @@ fn intent_of(actions: &[Action]) -> Intent {
     for a in actions {
         match *a {
             Action::Deposit { token, amount } => intent.deposits.push((token, amount)),
-            Action::Withdraw { token, amount, recipient } => intent.withdrawals.push((recipient, token, amount)),
-            Action::Transfer { token, amount, recipient } => intent.transfers.push((recipient, token, amount)),
+            Action::Withdraw {
+                token,
+                amount,
+                recipient,
+            } => intent.withdrawals.push((recipient, token, amount)),
+            Action::Transfer {
+                token,
+                amount,
+                recipient,
+            } => intent.transfers.push((recipient, token, amount)),
         }
     }
     intent
@@ -562,7 +685,8 @@ fn describe(intent: &Intent) -> String {
     let wei = |a: u128| format!("{a} (base units)");
     let mut parts = Vec::new();
     if intent.register {
-        parts.push("register your viewing key (public: links this address to the pool)".to_string());
+        parts
+            .push("register your viewing key (public: links this address to the pool)".to_string());
     }
     for (t, a) in &intent.deposits {
         parts.push(format!("deposit {} of {t:#x} (public)", wei(*a)));
@@ -612,8 +736,16 @@ pub(super) fn notes_json(notes: &[NoteLocator]) -> Value {
         .collect::<Vec<_>>())
 }
 
-async fn discover_state(ctx: &Ctx, reader: &NodeReader, user_sk: Felt, intent: &Intent) -> Result<State, WalletRpcError> {
-    let registered = discovery::public_key(reader, ctx.user).await.map_err(map_strk20)?.is_some();
+async fn discover_state(
+    ctx: &Ctx,
+    reader: &NodeReader,
+    user_sk: Felt,
+    intent: &Intent,
+) -> Result<State, WalletRpcError> {
+    let registered = discovery::public_key(reader, ctx.user)
+        .await
+        .map_err(map_strk20)?
+        .is_some();
     let mut channels = BTreeMap::new();
     if registered {
         let recipients = intent.transfers.iter().map(|t| t.0).chain([ctx.user]);
@@ -621,23 +753,51 @@ async fn discover_state(ctx: &Ctx, reader: &NodeReader, user_sk: Felt, intent: &
             if channels.contains_key(&r) {
                 continue;
             }
-            channels.insert(r, discovery::discover_channel(reader, ctx.user, user_sk, r).await.map_err(map_strk20)?);
+            channels.insert(
+                r,
+                discovery::discover_channel(reader, ctx.user, user_sk, r)
+                    .await
+                    .map_err(map_strk20)?,
+            );
         }
     }
-    let tokens: Vec<Felt> = intent.transfers.iter().map(|t| t.1).chain(intent.withdrawals.iter().map(|w| w.1)).collect();
+    let tokens: Vec<Felt> = intent
+        .transfers
+        .iter()
+        .map(|t| t.1)
+        .chain(intent.withdrawals.iter().map(|w| w.1))
+        .collect();
     let notes = if registered && !tokens.is_empty() {
-        discovery::discover_notes(reader, ctx.user, user_sk, &tokens).await.map_err(map_strk20)?
+        discovery::discover_notes(reader, ctx.user, user_sk, &tokens)
+            .await
+            .map_err(map_strk20)?
     } else {
         Vec::new()
     };
-    let outgoing_channels = if registered { discovery::outgoing_channel_count(reader, ctx.user, user_sk).await.map_err(map_strk20)? } else { 0 };
-    Ok(State { user: ctx.user, user_sk, registered, outgoing_channels, channels, notes })
+    let outgoing_channels = if registered {
+        discovery::outgoing_channel_count(reader, ctx.user, user_sk)
+            .await
+            .map_err(map_strk20)?
+    } else {
+        0
+    };
+    Ok(State {
+        user: ctx.user,
+        user_sk,
+        registered,
+        outgoing_channels,
+        channels,
+        notes,
+    })
 }
 
 /// Whether two discoveries of the same account agree on everything a plan
 /// writes to or spends.
 fn same_state(a: &State, b: &State) -> bool {
-    a.registered == b.registered && a.outgoing_channels == b.outgoing_channels && a.channels == b.channels && a.notes == b.notes
+    a.registered == b.registered
+        && a.outgoing_channels == b.outgoing_channels
+        && a.channels == b.channels
+        && a.notes == b.notes
 }
 
 /// A batch planned against the reference block: the part of the pipeline that
@@ -681,7 +841,9 @@ pub(super) fn opened_channels(plan: &Plan) -> Vec<Felt> {
     plan.actions
         .iter()
         .filter_map(|a| match a {
-            strk20::actions::ClientAction::OpenChannel { recipient_addr, .. } => Some(*recipient_addr),
+            strk20::actions::ClientAction::OpenChannel { recipient_addr, .. } => {
+                Some(*recipient_addr)
+            }
             _ => None,
         })
         .collect()
@@ -735,18 +897,34 @@ async fn plan_at_reference(
     if plan.warnings.contains(&Warning::UserLinkage) && linkage == Linkage::Refuse {
         return Err(linkage_refused(&ctx.subject));
     }
-    Ok(Planned { block, user_sk, state: st, plan })
+    Ok(Planned {
+        block,
+        user_sk,
+        state: st,
+        plan,
+    })
 }
 
 /// How the prompt names where the batch is proved.
 fn where_proved(prover: &prover::ProverState, proving: &Proving) -> String {
     match proving {
         Proving::Local if prover.prover.kind() == "native" => "proved on this machine".to_string(),
-        Proving::Local => "proved by your configured remote prover, which will see your viewing key".to_string(),
-        Proving::Remote(p) => format!("proved by {}, which screens the depositor and will see your viewing key", p.describe()),
+        Proving::Local => {
+            "proved by your configured remote prover, which will see your viewing key".to_string()
+        }
+        Proving::Remote(p) => format!(
+            "proved by {}, which screens the depositor and will see your viewing key",
+            p.describe()
+        ),
         Proving::LocalScreened(_) => {
-            let by = if prover.prover.kind() == "native" { "proved on this machine" } else { "proved by your configured remote prover" };
-            format!("{by}, screened with the test screener key from Settings → STRK20 (testnet only)")
+            let by = if prover.prover.kind() == "native" {
+                "proved on this machine"
+            } else {
+                "proved by your configured remote prover"
+            };
+            format!(
+                "{by}, screened with the test screener key from Settings → STRK20 (testnet only)"
+            )
         }
     }
 }
@@ -761,7 +939,12 @@ async fn prepare(
     submission: &str,
 ) -> Result<Prepared, WalletRpcError> {
     let prover = prover_or_err(state)?;
-    let Planned { block, user_sk, plan, .. } = plan_at_reference(state, ctx, intent, Linkage::Refuse).await?;
+    let Planned {
+        block,
+        user_sk,
+        plan,
+        ..
+    } = plan_at_reference(state, ctx, intent, Linkage::Refuse).await?;
 
     // A test screener key that isn't this pool's fails here, before the prompt
     // and a wasted proof.
@@ -788,44 +971,73 @@ async fn prepare(
 
     let pool_nonce = ctx
         .node
-        .raw("starknet_getNonce", json!({ "block_id": { "block_number": block }, "contract_address": hex(&ctx.pool) }))
+        .raw(
+            "starknet_getNonce",
+            json!({ "block_id": { "block_number": block }, "contract_address": hex(&ctx.pool) }),
+        )
         .await
         .map_err(node_err)?;
-    let pool_nonce = pool_nonce.as_str().and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| node_err("getNonce: bad felt"))?;
-    let invocation = ProofInvocation::new(ctx.pool, ctx.chain, pool_nonce, ctx.user, user_sk, &plan.actions);
-    let signature = state.session.lock().await.sign_hash_for(&ctx.account, &invocation.hash())?;
+    let pool_nonce = pool_nonce
+        .as_str()
+        .and_then(|s| Felt::from_hex(s).ok())
+        .ok_or_else(|| node_err("getNonce: bad felt"))?;
+    let invocation = ProofInvocation::new(
+        ctx.pool,
+        ctx.chain,
+        pool_nonce,
+        ctx.user,
+        user_sk,
+        &plan.actions,
+    );
+    let signature = state
+        .session
+        .lock()
+        .await
+        .sign_hash_for(&ctx.account, &invocation.hash())?;
     let tx = invocation.to_rpc_json(&signature);
 
     let local_screener = match proving {
         Proving::LocalScreened(sk) => Some(sk),
         _ => None,
     };
-    let result = match proving {
-        Proving::Local | Proving::LocalScreened(_) => prover::prove_unrecorded(
-            prover,
-            json!({ "transaction": tx, "block_number": block }),
-            Some(format!("STRK20 {method}")),
-            prover_network(ctx.chain).to_string(),
-        )
-        .await
-        .map_err(|e| {
-            // Never the prover's text (see `safe_prover_error`).
-            let (reason, message) = safe_prover_error(&e, false, block);
-            WalletRpcError::Unknown(format!("proving failed: {message}")).with_reason(reason)
-        })?,
-        Proving::Remote(p) => remote::prove(&p, ctx.chain, block, &tx).await.map_err(|e| match e {
-            remote::RemoteError::ScreeningRejected(_) => WalletRpcError::Precondition(e.to_string()),
-            _ => WalletRpcError::Unknown(scrub(&e.to_string(), user_sk)),
-        })?,
-    };
+    let result =
+        match proving {
+            Proving::Local | Proving::LocalScreened(_) => prover::prove_unrecorded(
+                prover,
+                json!({ "transaction": tx, "block_number": block }),
+                Some(format!("STRK20 {method}")),
+                prover_network(ctx.chain).to_string(),
+            )
+            .await
+            .map_err(|e| {
+                // Never the prover's text (see `safe_prover_error`).
+                let (reason, message) = safe_prover_error(&e, false, block);
+                WalletRpcError::Unknown(format!("proving failed: {message}")).with_reason(reason)
+            })?,
+            Proving::Remote(p) => remote::prove(&p, ctx.chain, block, &tx)
+                .await
+                .map_err(|e| match e {
+                    remote::RemoteError::ScreeningRejected(_) => {
+                        WalletRpcError::Precondition(e.to_string())
+                    }
+                    _ => WalletRpcError::Unknown(scrub(&e.to_string(), user_sk)),
+                })?,
+        };
     let mut proved = remote::parse_result(&result, &ctx.pool).map_err(|_| unreadable_proof())?;
     if let Some(sk) = local_screener {
         // Signed after proving: the attestation is not proof-bound, and it
         // expires 300 s after `issued_at`.
-        proved.screening = Some(screener::attest(ctx.node.as_ref(), ctx.chain, ctx.user, &sk).await?);
+        proved.screening =
+            Some(screener::attest(ctx.node.as_ref(), ctx.chain, ctx.user, &sk).await?);
     }
-    let call = strk20::apply::apply_actions_call(ctx.pool, &proved.output, proved.screening.as_ref()).map_err(map_strk20)?;
-    Ok(Prepared { call, proved, notes: plan.notes })
+    let call =
+        strk20::apply::apply_actions_call(ctx.pool, &proved.output, proved.screening.as_ref())
+            .map_err(map_strk20)?;
+    Ok(Prepared {
+        call,
+        proved,
+        notes: plan.notes,
+    })
 }
 
 /// A prover result Bramble Companion can't parse. Fixed text: the result came from the
@@ -860,7 +1072,9 @@ fn proving_for(ctx: &Ctx, actions: &[Action]) -> Result<Proving, WalletRpcError>
         if let Some(sk) = screener::local_key(&ctx.cfg, ctx.chain)? {
             return Ok(Proving::LocalScreened(sk));
         }
-        remote::DepositProver::resolve(&ctx.cfg, ctx.chain).map(Proving::Remote).map_err(WalletRpcError::Precondition)
+        remote::DepositProver::resolve(&ctx.cfg, ctx.chain)
+            .map(Proving::Remote)
+            .map_err(WalletRpcError::Precondition)
     } else {
         Ok(Proving::Local)
     }
@@ -874,8 +1088,15 @@ async fn pool_fee(ctx: &Ctx) -> Result<u128, WalletRpcError> {
 
 /// The pool's fee (in STRK) at `latest`.
 async fn pool_fee_at(node: &Arc<dyn StarknetRpc>, pool: Felt) -> Result<u128, WalletRpcError> {
-    let reader = NodeReader { node: node.clone(), pool, block: json!("latest") };
-    let out = reader.call(get_selector_from_name("get_fee_amount"), vec![]).await.map_err(map_strk20)?;
+    let reader = NodeReader {
+        node: node.clone(),
+        pool,
+        block: json!("latest"),
+    };
+    let out = reader
+        .call(get_selector_from_name("get_fee_amount"), vec![])
+        .await
+        .map_err(map_strk20)?;
     let fee = out.first().copied().unwrap_or(Felt::ZERO);
     u128::try_from(fee).map_err(|_| node_err("get_fee_amount exceeds u128"))
 }
@@ -895,8 +1116,19 @@ async fn check_public_funds(ctx: &Ctx, deposits: &[(Felt, u128)]) -> Result<(), 
     for (token, need) in needed {
         let request = json!({ "contract_address": hex(&token), "entry_point_selector": hex(&get_selector_from_name("balance_of")),
                               "calldata": [hex(&ctx.user)] });
-        let out = ctx.node.raw("starknet_call", json!({ "request": request, "block_id": "latest" })).await.map_err(node_err)?;
-        let low = out.get(0).and_then(Value::as_str).and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| node_err("balance_of: bad result"))?;
+        let out = ctx
+            .node
+            .raw(
+                "starknet_call",
+                json!({ "request": request, "block_id": "latest" }),
+            )
+            .await
+            .map_err(node_err)?;
+        let low = out
+            .get(0)
+            .and_then(Value::as_str)
+            .and_then(|s| Felt::from_hex(s).ok())
+            .ok_or_else(|| node_err("balance_of: bad result"))?;
         let have = u128::try_from(low).unwrap_or(u128::MAX);
         if have < need {
             return Err(WalletRpcError::Precondition(format!(
@@ -910,14 +1142,28 @@ async fn check_public_funds(ctx: &Ctx, deposits: &[(Felt, u128)]) -> Result<(), 
 }
 
 fn approve(token: Felt, spender: Felt, amount: u128) -> Call {
-    Call { to: token, selector: get_selector_from_name("approve"), calldata: vec![spender, Felt::from(amount), Felt::ZERO] }
+    Call {
+        to: token,
+        selector: get_selector_from_name("approve"),
+        calldata: vec![spender, Felt::from(amount), Felt::ZERO],
+    }
 }
 
 /// Submit `apply_actions` (plus the ERC-20 approvals the pool will `transfer_from`)
 /// as a proof-carrying invoke from the user's account.
-async fn submit_from_account(state: &ServerState, ctx: &Ctx, prepared: &Prepared, deposits: &[(Felt, u128)]) -> Result<Felt, WalletRpcError> {
-    let target =
-        SubmitTarget { session: state.session.clone(), node: ctx.node.clone(), chain: ctx.chain, pool: ctx.pool, guard: None };
+async fn submit_from_account(
+    state: &ServerState,
+    ctx: &Ctx,
+    prepared: &Prepared,
+    deposits: &[(Felt, u128)],
+) -> Result<Felt, WalletRpcError> {
+    let target = SubmitTarget {
+        session: state.session.clone(),
+        node: ctx.node.clone(),
+        chain: ctx.chain,
+        pool: ctx.pool,
+        guard: None,
+    };
     submit_from(&target, &ctx.account, prepared, deposits).await
 }
 
@@ -961,7 +1207,11 @@ impl SubmitGuard {
         let in_scope = session
             .registry()?
             .scoped_for(self.scope.as_deref())
-            .any(|a| a.address == submitter.address && a.domain == submitter.domain && a.index == submitter.index);
+            .any(|a| {
+                a.address == submitter.address
+                    && a.domain == submitter.domain
+                    && a.index == submitter.index
+            });
         if !in_scope {
             return Err(WalletRpcError::Forbidden.with_reason("SUBMITTER_NOT_IN_SCOPE"));
         }
@@ -981,11 +1231,18 @@ async fn submit_from(
     prepared: &Prepared,
     deposits: &[(Felt, u128)],
 ) -> Result<Felt, WalletRpcError> {
-    let sender = Felt::from_hex(&submitter.address).map_err(|_| WalletRpcError::Unknown("bad stored address".into()))?;
+    let sender = Felt::from_hex(&submitter.address)
+        .map_err(|_| WalletRpcError::Unknown("bad stored address".into()))?;
     if let Some(a) = &prepared.proved.screening {
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         // Leave a minute for inclusion: the pool checks age against the block timestamp.
-        if now.saturating_add(60) > a.issued_at.saturating_add(strk20::apply::ATTESTATION_MAX_AGE_SECS) {
+        if now.saturating_add(60)
+            > a.issued_at
+                .saturating_add(strk20::apply::ATTESTATION_MAX_AGE_SECS)
+        {
             return Err(WalletRpcError::Precondition(
                 "the deposit's screening attestation expired before it could be submitted; retry the deposit".into(),
             ));
@@ -1005,17 +1262,28 @@ async fn submit_from(
     // STRK the batch itself pulls from the submitter (pool fee, STRK deposits):
     // the gas is paid from what is left.
     let strk_spent = approvals.get(&strk).copied().unwrap_or(0);
-    let mut calls: Vec<Call> = approvals.into_iter().map(|(t, a)| approve(t, target.pool, a)).collect();
+    let mut calls: Vec<Call> = approvals
+        .into_iter()
+        .map(|(t, a)| approve(t, target.pool, a))
+        .collect();
     calls.push(prepared.call.clone());
 
     let calldata = wallet_core::encode_calls(&calls);
     let nonce = target.node.get_nonce(&sender).await.map_err(node_err)?;
     let padded = target
         .node
-        .estimate_invoke_with_proof(&sender, &calldata, &nonce, &prepared.proved.proof_facts, &prepared.proved.proof)
+        .estimate_invoke_with_proof(
+            &sender,
+            &calldata,
+            &nonce,
+            &prepared.proved.proof_facts,
+            &prepared.proved.proof,
+        )
         .await
         .map_err(submit_err)?;
-    let bounds = crate::fee::fit_bounds_to_balance(target.node.as_ref(), &sender, padded, strk_spent).await?;
+    let bounds =
+        crate::fee::fit_bounds_to_balance(target.node.as_ref(), &sender, padded, strk_spent)
+            .await?;
     let session = target.session.lock().await;
     if let Some(g) = &target.guard {
         g.check(&session, submitter)?;
@@ -1039,7 +1307,15 @@ async fn submit_from(
     }
     target
         .node
-        .add_invoke(&sender, &signed.calldata, &signed.signature, &nonce, &bounds, &prepared.proved.proof_facts, Some(&prepared.proved.proof))
+        .add_invoke(
+            &sender,
+            &signed.calldata,
+            &signed.signature,
+            &nonce,
+            &bounds,
+            &prepared.proved.proof_facts,
+            Some(&prepared.proved.proof),
+        )
         .await
         .map_err(|e| {
             if crate::fee::is_exceed_balance(&e.to_string()) {
@@ -1055,18 +1331,30 @@ async fn submit_from(
 /// `wallet_strk20Balances { tokens, account_address?, chainId? }` → `[{token, balance}]`.
 ///
 /// Reveals private balances to the caller, so it is gated like a signature.
-pub async fn balances(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<Value, WalletRpcError> {
+pub async fn balances(
+    state: &ServerState,
+    caller: Caller<'_>,
+    params: &Value,
+) -> Result<Value, WalletRpcError> {
     let tokens: Vec<Felt> = params
         .get("tokens")
         .and_then(Value::as_array)
         .ok_or_else(|| invalid("missing array param 'tokens'"))?
         .iter()
-        .map(|t| t.as_str().and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| invalid("tokens: expected felts")))
+        .map(|t| {
+            t.as_str()
+                .and_then(|s| Felt::from_hex(s).ok())
+                .ok_or_else(|| invalid("tokens: expected felts"))
+        })
         .collect::<Result<_, _>>()?;
     if tokens.is_empty() || tokens.len() > MAX_TOKENS {
-        return Err(invalid(format!("tokens: between 1 and {MAX_TOKENS} required")));
+        return Err(invalid(format!(
+            "tokens: between 1 and {MAX_TOKENS} required"
+        )));
     }
-    let ctx = ctx(state, caller, params).await?.account_only("wallet_strk20Balances")?;
+    let ctx = ctx(state, caller, params)
+        .await?
+        .account_only("wallet_strk20Balances")?;
     caller
         .approve(
             state,
@@ -1082,14 +1370,24 @@ pub async fn balances(state: &ServerState, caller: Caller<'_>, params: &Value) -
         .await?;
     let user_sk = ctx.viewing_key(state).await?;
     let reader = ctx.reader(json!("latest"));
-    if discovery::public_key(&reader, ctx.user).await.map_err(map_strk20)?.is_none() {
+    if discovery::public_key(&reader, ctx.user)
+        .await
+        .map_err(map_strk20)?
+        .is_none()
+    {
         return Err(WalletRpcError::Strk20NotRegistered(ctx.address()));
     }
-    let notes = discovery::discover_notes(&reader, ctx.user, user_sk, &tokens).await.map_err(map_strk20)?;
+    let notes = discovery::discover_notes(&reader, ctx.user, user_sk, &tokens)
+        .await
+        .map_err(map_strk20)?;
     Ok(json!(tokens
         .iter()
         .map(|t| {
-            let total: u128 = notes.iter().filter(|n| n.token == *t).map(|n| n.amount).sum();
+            let total: u128 = notes
+                .iter()
+                .filter(|n| n.token == *t)
+                .map(|n| n.amount)
+                .sum();
             json!({ "token": hex(t), "balance": format!("{total:#x}") })
         })
         .collect::<Vec<_>>()))
@@ -1099,15 +1397,39 @@ pub async fn balances(state: &ServerState, caller: Caller<'_>, params: &Value) -
 ///
 /// Registers the viewing key and opens the account's channel to itself, proved
 /// locally, submitted from the account (registration is public by nature).
-pub async fn register(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<Value, WalletRpcError> {
-    let ctx = ctx(state, caller, params).await?.account_only("companion_strk20Register")?;
+pub async fn register(
+    state: &ServerState,
+    caller: Caller<'_>,
+    params: &Value,
+) -> Result<Value, WalletRpcError> {
+    let ctx = ctx(state, caller, params)
+        .await?
+        .account_only("companion_strk20Register")?;
     let reader = ctx.reader(json!("latest"));
-    if discovery::public_key(&reader, ctx.user).await.map_err(map_strk20)?.is_some() {
-        return Err(WalletRpcError::Precondition(format!("{} is already registered with the pool", ctx.address())));
+    if discovery::public_key(&reader, ctx.user)
+        .await
+        .map_err(map_strk20)?
+        .is_some()
+    {
+        return Err(WalletRpcError::Precondition(format!(
+            "{} is already registered with the pool",
+            ctx.address()
+        )));
     }
-    let intent = Intent { register: true, ..Intent::default() };
-    let prepared =
-        prepare(state, caller, "companion_strk20Register", &ctx, &intent, Proving::Local, "submitted from this account").await?;
+    let intent = Intent {
+        register: true,
+        ..Intent::default()
+    };
+    let prepared = prepare(
+        state,
+        caller,
+        "companion_strk20Register",
+        &ctx,
+        &intent,
+        Proving::Local,
+        "submitted from this account",
+    )
+    .await?;
     let hash = submit_from_account(state, &ctx, &prepared, &[]).await?;
     Ok(json!({ "transaction_hash": hex(&hash) }))
 }
@@ -1116,10 +1438,19 @@ pub async fn register(state: &ServerState, caller: Caller<'_>, params: &Value) -
 /// → `STRK20_CALL_AND_PROOF` plus `notes` (#49), for the caller to submit from
 /// any account. The locators hold only if this call lands before any other
 /// batch from the account to the same recipient and token.
-pub async fn prepare_invoke(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<Value, WalletRpcError> {
+pub async fn prepare_invoke(
+    state: &ServerState,
+    caller: Caller<'_>,
+    params: &Value,
+) -> Result<Value, WalletRpcError> {
     let actions = parse_actions(params)?;
-    let ctx = ctx(state, caller, params).await?.account_only("wallet_strk20PrepareInvoke")?;
-    let simulate = params.get("simulate").and_then(Value::as_bool).unwrap_or(false);
+    let ctx = ctx(state, caller, params)
+        .await?
+        .account_only("wallet_strk20PrepareInvoke")?;
+    let simulate = params
+        .get("simulate")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let proving = proving_for(&ctx, &actions)?;
     let prepared = prepare(
         state,
@@ -1143,9 +1474,15 @@ pub async fn prepare_invoke(state: &ServerState, caller: Caller<'_>, params: &Va
 /// batch with private actions. Everything else is relayed by the AVNU
 /// paymaster, paying its fee from the shielded balance; without an AVNU key
 /// the caller is pointed to `wallet_strk20PrepareInvoke`.
-pub async fn invoke_transaction(state: &ServerState, caller: Caller<'_>, params: &Value) -> Result<Value, WalletRpcError> {
+pub async fn invoke_transaction(
+    state: &ServerState,
+    caller: Caller<'_>,
+    params: &Value,
+) -> Result<Value, WalletRpcError> {
     let actions = parse_actions(params)?;
-    let ctx = ctx(state, caller, params).await?.account_only("wallet_strk20InvokeTransaction")?;
+    let ctx = ctx(state, caller, params)
+        .await?
+        .account_only("wallet_strk20InvokeTransaction")?;
     let mut intent = intent_of(&actions);
 
     if has_deposit(&actions) {
@@ -1157,8 +1494,16 @@ pub async fn invoke_transaction(state: &ServerState, caller: Caller<'_>, params:
         }
         let proving = proving_for(&ctx, &actions)?;
         check_public_funds(&ctx, &intent.deposits).await?;
-        let prepared =
-            prepare(state, caller, "wallet_strk20InvokeTransaction", &ctx, &intent, proving, "submitted from this account").await?;
+        let prepared = prepare(
+            state,
+            caller,
+            "wallet_strk20InvokeTransaction",
+            &ctx,
+            &intent,
+            proving,
+            "submitted from this account",
+        )
+        .await?;
         let hash = submit_from_account(state, &ctx, &prepared, &intent.deposits).await?;
         return Ok(json!({ "transaction_hash": hex(&hash), "notes": notes_json(&prepared.notes) }));
     }
@@ -1176,9 +1521,17 @@ pub async fn invoke_transaction(state: &ServerState, caller: Caller<'_>, params:
         u => u.to_string(),
     };
     let relay = paymaster::Paymaster::new(&url, ctx.cfg.avnu_api_key.trim(), felt(STRK));
-    let fee = relay.quote(&ctx.pool, &ctx.user).await.map_err(WalletRpcError::Unknown)?;
-    intent.withdrawals.push((fee.recipient, fee.token, fee.amount));
-    let submission = format!("relayed privately by the AVNU paymaster for a fee of {} (base units of {:#x})", fee.amount, fee.token);
+    let fee = relay
+        .quote(&ctx.pool, &ctx.user)
+        .await
+        .map_err(WalletRpcError::Unknown)?;
+    intent
+        .withdrawals
+        .push((fee.recipient, fee.token, fee.amount));
+    let submission = format!(
+        "relayed privately by the AVNU paymaster for a fee of {} (base units of {:#x})",
+        fee.amount, fee.token
+    );
     let prepared = prepare(state, caller, "wallet_strk20InvokeTransaction", &ctx, &intent, Proving::Local, &submission)
         .await
         .map_err(|e| match e {
@@ -1188,7 +1541,14 @@ pub async fn invoke_transaction(state: &ServerState, caller: Caller<'_>, params:
             )),
             e => e,
         })?;
-    let hash = relay.execute(&prepared.call, &prepared.proved.proof, &prepared.proved.proof_facts).await.map_err(WalletRpcError::Unknown)?;
+    let hash = relay
+        .execute(
+            &prepared.call,
+            &prepared.proved.proof,
+            &prepared.proved.proof_facts,
+        )
+        .await
+        .map_err(WalletRpcError::Unknown)?;
     Ok(json!({ "transaction_hash": hex(&hash), "notes": notes_json(&prepared.notes) }))
 }
 
@@ -1204,28 +1564,52 @@ mod tests {
             { "type": "withdraw", "token": STRK, "amount": "0x5", "recipient": "0xa11ce" },
         ]});
         let a = parse_actions(&p).unwrap();
-        assert_eq!(a[0], Action::Deposit { token: felt(STRK), amount: 10u128.pow(18) });
+        assert_eq!(
+            a[0],
+            Action::Deposit {
+                token: felt(STRK),
+                amount: 10u128.pow(18)
+            }
+        );
         let i = intent_of(&a);
-        assert_eq!((i.deposits.len(), i.transfers.len(), i.withdrawals.len()), (1, 1, 1));
+        assert_eq!(
+            (i.deposits.len(), i.transfers.len(), i.withdrawals.len()),
+            (1, 1, 1)
+        );
     }
 
     #[test]
     fn rejects_unsupported_and_malformed_actions() {
         let open = json!({ "actions": [{ "type": "transfer", "token": STRK, "amount": "OPEN", "recipient": "0x1" }] });
-        assert!(matches!(parse_actions(&open), Err(WalletRpcError::NotImplemented(_))));
-        let invoke = json!({ "actions": [{ "type": "invoke", "contract": "0x1", "calldata": [] }] });
-        assert!(matches!(parse_actions(&invoke), Err(WalletRpcError::NotImplemented(_))));
+        assert!(matches!(
+            parse_actions(&open),
+            Err(WalletRpcError::NotImplemented(_))
+        ));
+        let invoke =
+            json!({ "actions": [{ "type": "invoke", "contract": "0x1", "calldata": [] }] });
+        assert!(matches!(
+            parse_actions(&invoke),
+            Err(WalletRpcError::NotImplemented(_))
+        ));
         let zero = json!({ "actions": [{ "type": "deposit", "token": STRK, "amount": "0x0" }] });
-        assert!(matches!(parse_actions(&zero), Err(WalletRpcError::InvalidRequest(_))));
+        assert!(matches!(
+            parse_actions(&zero),
+            Err(WalletRpcError::InvalidRequest(_))
+        ));
         assert!(parse_actions(&json!({ "actions": [] })).is_err());
     }
 
     #[test]
     fn scrubs_the_viewing_key_in_every_spelling() {
-        let sk = Felt::from_hex("0x2f6c0b3c1a9e5d4f8b7a6e5d4c3b2a19087f6e5d4c3b2a1908f7e6d5c4b3a29").unwrap();
+        let sk =
+            Felt::from_hex("0x2f6c0b3c1a9e5d4f8b7a6e5d4c3b2a19087f6e5d4c3b2a1908f7e6d5c4b3a29")
+                .unwrap();
         let text = format!("calldata [0x1, {sk:#x}, 0x{sk:064x}, {sk}]");
         let out = scrub(&text, sk);
-        assert!(!out.contains(&format!("{sk:#x}")[2..]) && !out.contains(&sk.to_string()), "{out}");
+        assert!(
+            !out.contains(&format!("{sk:#x}")[2..]) && !out.contains(&sk.to_string()),
+            "{out}"
+        );
         assert_eq!(out.matches("<viewing key>").count(), 3);
     }
 
@@ -1233,29 +1617,55 @@ mod tests {
     fn pool_reverts_are_explained() {
         let raw = r#"rpc: {"code":41,"data":{"error":"0x53435245454e494e475f5245515549524544 ('SCREENING_REQUIRED')"}}"#;
         assert_eq!(pool_revert(raw).as_deref(), Some("SCREENING_REQUIRED"));
-        assert!(matches!(submit_err(raw), WalletRpcError::Precondition(m) if m.contains("no screening attestation")));
-        assert!(matches!(submit_err("rpc: timeout"), WalletRpcError::Node(_)));
+        assert!(
+            matches!(submit_err(raw), WalletRpcError::Precondition(m) if m.contains("no screening attestation"))
+        );
+        assert!(matches!(
+            submit_err("rpc: timeout"),
+            WalletRpcError::Node(_)
+        ));
         let stale = r#"rpc: {"code":41,"data":{"error":"0x4e4f4e5f5a45524f5f56414c5545 ('NON_ZERO_VALUE')"}}"#;
-        assert!(matches!(submit_err(stale), WalletRpcError::Precondition(m) if m.contains("about a minute")));
+        assert!(
+            matches!(submit_err(stale), WalletRpcError::Precondition(m) if m.contains("about a minute"))
+        );
     }
 
     #[test]
     fn contract_not_found_is_told_apart_from_other_node_errors() {
-        assert!(is_contract_not_found(&NodeError::Rpc(r#"{"code":20,"message":"Contract not found"}"#.into())));
-        assert!(is_contract_not_found(&NodeError::Rpc("Contract not found".into())));
+        assert!(is_contract_not_found(&NodeError::Rpc(
+            r#"{"code":20,"message":"Contract not found"}"#.into()
+        )));
+        assert!(is_contract_not_found(&NodeError::Rpc(
+            "Contract not found".into()
+        )));
         // BLOCK_NOT_FOUND, transport and decode failures are node errors.
-        assert!(!is_contract_not_found(&NodeError::Rpc(r#"{"code":24,"message":"Block not found"}"#.into())));
-        assert!(!is_contract_not_found(&NodeError::Transport("contract not found".into())));
-        assert!(!is_contract_not_found(&NodeError::Decode("missing result".into())));
+        assert!(!is_contract_not_found(&NodeError::Rpc(
+            r#"{"code":24,"message":"Block not found"}"#.into()
+        )));
+        assert!(!is_contract_not_found(&NodeError::Transport(
+            "contract not found".into()
+        )));
+        assert!(!is_contract_not_found(&NodeError::Decode(
+            "missing result".into()
+        )));
     }
 
     #[test]
     fn pool_defaults_and_override() {
         let mut cfg = prover::Strk20Config::default();
-        assert_eq!(pool_for(&cfg, ChainId::Mainnet).unwrap(), felt(MAINNET_POOL));
-        assert_eq!(pool_for(&cfg, ChainId::Sepolia).unwrap(), felt(SEPOLIA_POOL));
+        assert_eq!(
+            pool_for(&cfg, ChainId::Mainnet).unwrap(),
+            felt(MAINNET_POOL)
+        );
+        assert_eq!(
+            pool_for(&cfg, ChainId::Sepolia).unwrap(),
+            felt(SEPOLIA_POOL)
+        );
         cfg.pool = "0x123".into();
-        assert_eq!(pool_for(&cfg, ChainId::Sepolia).unwrap(), Felt::from(0x123u64));
+        assert_eq!(
+            pool_for(&cfg, ChainId::Sepolia).unwrap(),
+            Felt::from(0x123u64)
+        );
     }
 }
 
@@ -1274,17 +1684,37 @@ mod safe_error_tests {
         );
         let (reason, m) = safe_prover_error(&revert, true, 9);
         assert_eq!(reason, "PROVING_FAILED");
-        assert!(m.starts_with("the batch reverted") && !m.contains(encoded), "{m}");
+        assert!(
+            m.starts_with("the batch reverted") && !m.contains(encoded),
+            "{m}"
+        );
         // The contract can make the pool fail INVALID_SIGNATURE and still not leak.
-        let (reason, m) = safe_prover_error(&format!("{revert} 'INVALID_SIGNATURE' {encoded}"), true, 9);
+        let (reason, m) =
+            safe_prover_error(&format!("{revert} 'INVALID_SIGNATURE' {encoded}"), true, 9);
         assert_eq!(reason, "OWNER_SIGNATURE_REJECTED");
-        assert!(m.contains("reference block 9") && !m.contains(encoded), "{m}");
-        assert_eq!(safe_prover_error("0x494E56414C49445F5349474E4154555245", false, 9).0, "INVALID_SIGNATURE");
+        assert!(
+            m.contains("reference block 9") && !m.contains(encoded),
+            "{m}"
+        );
+        assert_eq!(
+            safe_prover_error("0x494E56414C49445F5349474E4154555245", false, 9).0,
+            "INVALID_SIGNATURE"
+        );
         // Only the start counts: a known phrase inside quoted text is ignored.
-        let (_, m) = safe_prover_error(&format!("prover failed: {encoded} transaction too large to prove"), true, 9);
-        assert!(m.starts_with("proving failed.") && !m.contains(encoded), "{m}");
+        let (_, m) = safe_prover_error(
+            &format!("prover failed: {encoded} transaction too large to prove"),
+            true,
+            9,
+        );
+        assert!(
+            m.starts_with("proving failed.") && !m.contains(encoded),
+            "{m}"
+        );
         let (_, m) = safe_prover_error("transaction too large to prove: raw: whatever", true, 9);
         assert!(m.starts_with("the batch is too large"), "{m}");
-        assert_eq!(safe_prover_error(prover::WIPED_MESSAGE, true, 9).0, "WIPED_ON_LOCK");
+        assert_eq!(
+            safe_prover_error(prover::WIPED_MESSAGE, true, 9).0,
+            "WIPED_ON_LOCK"
+        );
     }
 }

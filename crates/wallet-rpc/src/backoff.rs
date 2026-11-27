@@ -56,7 +56,10 @@ mod tests {
         let mut b = PassphraseBackoff::default();
         for _ in 0..FREE_ATTEMPTS {
             b.record_failure(t0);
-            assert!(b.check(t0).is_ok(), "typos within the free attempts are not delayed");
+            assert!(
+                b.check(t0).is_ok(),
+                "typos within the free attempts are not delayed"
+            );
         }
         b.record_failure(t0);
         assert_eq!(b.check(t0), Err(BASE_DELAY));

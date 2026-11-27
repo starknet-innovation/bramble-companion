@@ -10,7 +10,10 @@ use serde_json::Value;
 use starknet_types_core::felt::Felt;
 use strk20::screening;
 
-const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/screening-vectors.json");
+const FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/screening-vectors.json"
+);
 
 fn f(v: &Value) -> Felt {
     Felt::from_hex(v.as_str().unwrap()).unwrap()
@@ -37,7 +40,11 @@ fn reproduces_every_screening_vector() {
         // RFC 6979 is deterministic, so Bramble Companion's signature is the vector's.
         let a = screening::attest(&sk, chain_id, depositor, issued_at).unwrap();
         assert_eq!(a.issued_at, issued_at, "{name}");
-        assert_eq!((a.sig_r, a.sig_s), (f(&v["sig_r"]), f(&v["sig_s"])), "{name}: signature");
+        assert_eq!(
+            (a.sig_r, a.sig_s),
+            (f(&v["sig_r"]), f(&v["sig_s"])),
+            "{name}: signature"
+        );
     }
 }
 

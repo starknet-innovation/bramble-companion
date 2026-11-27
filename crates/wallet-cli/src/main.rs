@@ -241,9 +241,14 @@ async fn run(command: Command, out: &Output) -> Result<(), String> {
 
 /// Load the saved pairing token, or fail with a pointer to `bramble-companion pair`.
 fn require_token() -> Result<String, String> {
-    token::load()
-        .map(|p| p.token)
-        .ok_or_else(|| concat!("not paired yet — run `", env!("CARGO_BIN_NAME"), " pair` first").to_string())
+    token::load().map(|p| p.token).ok_or_else(|| {
+        concat!(
+            "not paired yet — run `",
+            env!("CARGO_BIN_NAME"),
+            " pair` first"
+        )
+        .to_string()
+    })
 }
 
 /// Read a JSON argument that is either inline JSON or `@path-to-file`.
@@ -274,6 +279,8 @@ fn chain_id_felt(network: &str) -> Result<String, String> {
     match network.to_ascii_lowercase().as_str() {
         "sepolia" | "sn_sepolia" => Ok("0x534e5f5345504f4c4941".to_string()),
         "mainnet" | "main" | "sn_main" => Ok("0x534e5f4d41494e".to_string()),
-        other => Err(format!("unknown network '{other}' (use sepolia or mainnet)")),
+        other => Err(format!(
+            "unknown network '{other}' (use sepolia or mainnet)"
+        )),
     }
 }

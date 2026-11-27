@@ -62,7 +62,10 @@ pub fn transport_guard(headers: &HeaderMap) -> Result<(), &'static str> {
         Some(h) if is_loopback_host(h) => {}
         _ => return Err("Host must be loopback"),
     }
-    match headers.get("x-companion-client").and_then(|v| v.to_str().ok()) {
+    match headers
+        .get("x-companion-client")
+        .and_then(|v| v.to_str().ok())
+    {
         Some(v) if !v.is_empty() => {}
         _ => return Err("missing X-Companion-Client header"),
     }
@@ -89,7 +92,10 @@ async fn rpc_handler(
         Err(_) => {
             return (
                 StatusCode::OK,
-                Json(Response::err(Value::Null, WalletRpcError::Parse.to_object())),
+                Json(Response::err(
+                    Value::Null,
+                    WalletRpcError::Parse.to_object(),
+                )),
             )
         }
     };
@@ -102,7 +108,10 @@ async fn rpc_handler(
 /// Self-describing usage doc (spec §7). Open discovery — no auth or transport
 /// guard, since it returns only public usage info and no state changes.
 async fn usage_handler(State(state): State<Arc<ServerState>>) -> Json<Value> {
-    Json(crate::usage::usage_doc(&state.api_version, &state.spec_versions))
+    Json(crate::usage::usage_doc(
+        &state.api_version,
+        &state.spec_versions,
+    ))
 }
 
 /// Build the axum router for the service. `GET /` (and `/usage`) serve the usage
@@ -177,10 +186,23 @@ mod tests {
 
     #[test]
     fn loopback_host_detection() {
-        for ok in ["127.0.0.1", "127.0.0.1:8080", "localhost", "localhost:3000", "::1", "[::1]", "[::1]:9000"] {
+        for ok in [
+            "127.0.0.1",
+            "127.0.0.1:8080",
+            "localhost",
+            "localhost:3000",
+            "::1",
+            "[::1]",
+            "[::1]:9000",
+        ] {
             assert!(is_loopback_host(ok), "{ok} should be loopback");
         }
-        for bad in ["evil.com", "evil.com:80", "192.168.1.5", "example.localhost"] {
+        for bad in [
+            "evil.com",
+            "evil.com:80",
+            "192.168.1.5",
+            "example.localhost",
+        ] {
             assert!(!is_loopback_host(bad), "{bad} should NOT be loopback");
         }
     }
@@ -224,7 +246,10 @@ mod tests {
 
     #[test]
     fn locked_port_round_trips_through_port_lock() {
-        let path = std::env::temp_dir().join(format!("bramble-companion-portlock-{}.json", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "bramble-companion-portlock-{}.json",
+            std::process::id()
+        ));
         write_port_lock(&path, 54321).unwrap();
         assert_eq!(read_locked_port(&path), Some(54321));
         let _ = std::fs::remove_file(&path);
@@ -235,7 +260,10 @@ mod tests {
         let missing = std::env::temp_dir().join("bramble-companion-portlock-does-not-exist.json");
         assert_eq!(read_locked_port(&missing), None);
 
-        let bad = std::env::temp_dir().join(format!("bramble-companion-portlock-bad-{}.json", std::process::id()));
+        let bad = std::env::temp_dir().join(format!(
+            "bramble-companion-portlock-bad-{}.json",
+            std::process::id()
+        ));
         std::fs::write(&bad, b"not json").unwrap();
         assert_eq!(read_locked_port(&bad), None);
         let _ = std::fs::remove_file(&bad);
@@ -249,10 +277,18 @@ mod tests {
         drop(first);
 
         let again = bind_sticky(Some(port)).await.unwrap();
-        assert_eq!(again.local_addr().unwrap().port(), port, "should reuse the freed port");
+        assert_eq!(
+            again.local_addr().unwrap().port(),
+            port,
+            "should reuse the freed port"
+        );
 
         // With that port still held, a second sticky bind must fall back, not error.
         let fallback = bind_sticky(Some(port)).await.unwrap();
-        assert_ne!(fallback.local_addr().unwrap().port(), port, "should fall back to a free port");
+        assert_ne!(
+            fallback.local_addr().unwrap().port(),
+            port,
+            "should fall back to a free port"
+        );
     }
 }

@@ -12,7 +12,6 @@ use wallet_core::{address_hex, AccountRef, ChainId, Felt};
 
 use wallet_core::{Call, InvokeV3Params, ResourceBounds, SierraClass};
 
-use crate::strk20;
 use crate::approval::{ApprovalRequest, Approver, Decision};
 use crate::auth::{ClientKind, ClientStore, PairedClient};
 use crate::error::WalletRpcError;
@@ -21,6 +20,7 @@ use crate::log::{now_unix_ms, LogEntry, RequestLog};
 use crate::node::{FeeBounds, StarknetRpc};
 use crate::session::WalletSession;
 use crate::store::VaultStore;
+use crate::strk20;
 
 /// Shared state behind the service.
 pub struct ServerState {
@@ -163,7 +163,8 @@ impl ServerState {
 
     /// Mark "now" as the last activity (resets the auto-lock idle timer).
     pub fn touch_activity(&self) {
-        self.last_activity_ms.store(now_unix_ms(), Ordering::Relaxed);
+        self.last_activity_ms
+            .store(now_unix_ms(), Ordering::Relaxed);
     }
 
     /// Unix-ms of the last activity (for the auto-lock task).
@@ -263,7 +264,10 @@ pub(crate) fn is_display_safe(c: char) -> bool {
 /// Caller-supplied text made safe to show in a prompt: [`is_display_safe`]
 /// characters only, at most `max` of them.
 pub(crate) fn display_text(s: &str, max: usize) -> String {
-    s.chars().filter(|c| is_display_safe(*c)).take(max).collect()
+    s.chars()
+        .filter(|c| is_display_safe(*c))
+        .take(max)
+        .collect()
 }
 
 /// Truncate to at most `max` chars (char-safe), appending `…` if cut.
@@ -365,7 +369,9 @@ struct Handled {
 fn is_deferred(method: &str) -> bool {
     matches!(
         method,
-        "wallet_addStarknetChain" | "wallet_strk20ShadowAccountCommitment" | "wallet_strk20SubaccountCommitment"
+        "wallet_addStarknetChain"
+            | "wallet_strk20ShadowAccountCommitment"
+            | "wallet_strk20SubaccountCommitment"
     )
 }
 
@@ -384,7 +390,11 @@ pub async fn dispatch(state: &ServerState, token: Option<&str>, req: Request) ->
     let handled = handle(state, token, req).await;
 
     let (outcome, error_code, result_json) = match &handled.result {
-        Ok(v) => ("ok".to_string(), None, serde_json::to_string(&redact_for_log(&method, v)).ok()),
+        Ok(v) => (
+            "ok".to_string(),
+            None,
+            serde_json::to_string(&redact_for_log(&method, v)).ok(),
+        ),
         Err(e) => (
             format!("error {}: {}", e.code(), e.message()),
             Some(e.code()),
@@ -420,7 +430,10 @@ pub async fn dispatch(state: &ServerState, token: Option<&str>, req: Request) ->
 /// which carry channel keys (#48 §5.6, #49), and `companion_strk20ChannelKey`
 /// returns one: the caller gets them, the log gets a placeholder.
 const REDACTED_RESULT_FIELDS: &[(&str, &[&str])] = &[
-    ("companion_strk20Plan", &["client_actions", "client_actions_felts"]),
+    (
+        "companion_strk20Plan",
+        &["client_actions", "client_actions_felts"],
+    ),
     (strk20::channel::METHOD, &["channel_key"]),
 ];
 
@@ -432,7 +445,9 @@ const REDACTED_RESULT_FIELDS: &[(&str, &[&str])] = &[
 const REDACTED_STRK20_JOB_FIELDS: &[&str] = &["result", "error"];
 
 fn is_strk20_job(v: &Value) -> bool {
-    v.get("label").and_then(Value::as_str).is_some_and(|l| l.starts_with("STRK20 "))
+    v.get("label")
+        .and_then(Value::as_str)
+        .is_some_and(|l| l.starts_with("STRK20 "))
 }
 
 fn redact_for_log<'a>(method: &str, v: &'a Value) -> std::borrow::Cow<'a, Value> {
@@ -525,7 +540,9 @@ async fn handle(state: &ServerState, token: Option<&str>, req: Request) -> Handl
 
     if is_deferred(method) {
         return Handled {
-            result: Err(WalletRpcError::NotImplemented(format!("{method} is planned for a later phase"))),
+            result: Err(WalletRpcError::NotImplemented(format!(
+                "{method} is planned for a later phase"
+            ))),
             decision: "n/a".into(),
             client: Some(client_label),
         };
@@ -561,7 +578,9 @@ async fn handle(state: &ServerState, token: Option<&str>, req: Request) -> Handl
         "wallet_signTypedData" => handle_sign_typed_data(state, &client, &params).await,
         "wallet_addInvokeTransaction" => handle_add_invoke(state, &client, &params).await,
         "wallet_addDeclareTransaction" => handle_add_declare(state, &client, &params).await,
-        "companion_createAgentAccount" => handle_create_agent_account(state, &client, &params).await,
+        "companion_createAgentAccount" => {
+            handle_create_agent_account(state, &client, &params).await
+        }
         "wallet_switchStarknetChain" => handle_switch_chain(state, &client, &params).await,
         "wallet_watchAsset" => handle_watch_asset(state, &client, &params).await,
         "companion_fundingSource" => handle_funding_source(state).await,
@@ -575,22 +594,36 @@ async fn handle(state: &ServerState, token: Option<&str>, req: Request) -> Handl
         "companion_proveStatus" => handle_prove_status(state, &client, &params).await,
         "companion_proofActivity" => handle_proof_activity(state, &client).await,
         "companion_signAndProve" => handle_sign_and_prove(state, &client, &params).await,
-        "wallet_strk20Balances" => strk20::balances(state, strk20::Caller::Rpc(&client), &params).await,
-        "wallet_strk20PrepareInvoke" => strk20::prepare_invoke(state, strk20::Caller::Rpc(&client), &params).await,
+        "wallet_strk20Balances" => {
+            strk20::balances(state, strk20::Caller::Rpc(&client), &params).await
+        }
+        "wallet_strk20PrepareInvoke" => {
+            strk20::prepare_invoke(state, strk20::Caller::Rpc(&client), &params).await
+        }
         "wallet_strk20InvokeTransaction" => {
             strk20::invoke_transaction(state, strk20::Caller::Rpc(&client), &params).await
         }
-        "companion_strk20Register" => strk20::register(state, strk20::Caller::Rpc(&client), &params).await,
-        "companion_strk20AddOwner" => strk20::owners::add_owner(state, strk20::Caller::Rpc(&client), &params).await,
-        "companion_strk20ListOwners" => strk20::owners::list_owners(state, strk20::Caller::Rpc(&client)).await,
+        "companion_strk20Register" => {
+            strk20::register(state, strk20::Caller::Rpc(&client), &params).await
+        }
+        "companion_strk20AddOwner" => {
+            strk20::owners::add_owner(state, strk20::Caller::Rpc(&client), &params).await
+        }
+        "companion_strk20ListOwners" => {
+            strk20::owners::list_owners(state, strk20::Caller::Rpc(&client)).await
+        }
         "companion_strk20RemoveOwner" => {
             strk20::owners::remove_owner(state, strk20::Caller::Rpc(&client), &params).await
         }
-        "companion_strk20Plan" => strk20::plan::plan(state, strk20::Caller::Rpc(&client), &params).await,
+        "companion_strk20Plan" => {
+            strk20::plan::plan(state, strk20::Caller::Rpc(&client), &params).await
+        }
         "companion_strk20DiscardPlan" => {
             strk20::plan::discard(state, strk20::Caller::Rpc(&client), &params).await
         }
-        "companion_strk20Prove" => strk20::prove::prove(state, strk20::Caller::Rpc(&client), &params).await,
+        "companion_strk20Prove" => {
+            strk20::prove::prove(state, strk20::Caller::Rpc(&client), &params).await
+        }
         "companion_strk20ChannelKey" => {
             strk20::channel::channel_key(state, strk20::Caller::Rpc(&client), &params).await
         }
@@ -863,7 +896,8 @@ fn felt_from(value: &Value, what: &str) -> Result<Felt, WalletRpcError> {
     let s = value
         .as_str()
         .ok_or_else(|| WalletRpcError::InvalidRequest(format!("{what} must be a hex string")))?;
-    Felt::from_hex(s).map_err(|_| WalletRpcError::InvalidRequest(format!("invalid felt for {what}")))
+    Felt::from_hex(s)
+        .map_err(|_| WalletRpcError::InvalidRequest(format!("invalid felt for {what}")))
 }
 
 fn parse_resource_bounds(v: &Value) -> Result<ResourceBounds, WalletRpcError> {
@@ -933,7 +967,11 @@ fn parse_calls(params: &Value) -> Result<Vec<Call>, WalletRpcError> {
                 .map(|v| felt_from(v, "calldata element"))
                 .collect::<Result<Vec<_>, _>>()?,
             None | Some(Value::Null) => Vec::new(),
-            _ => return Err(WalletRpcError::InvalidRequest("calldata must be an array".into())),
+            _ => {
+                return Err(WalletRpcError::InvalidRequest(
+                    "calldata must be an array".into(),
+                ))
+            }
         };
         out.push(Call {
             to,
@@ -977,7 +1015,10 @@ fn opt_fee_bounds(params: &Value) -> Result<Option<FeeBounds>, WalletRpcError> {
 /// explicit and avoids the cross-agent race of a single shared mutable active
 /// chain (one client switching the network out from under another). An
 /// unsupported chain → 117; a malformed value → 114.
-pub(crate) async fn resolve_chain(state: &ServerState, params: &Value) -> Result<ChainId, WalletRpcError> {
+pub(crate) async fn resolve_chain(
+    state: &ServerState,
+    params: &Value,
+) -> Result<ChainId, WalletRpcError> {
     match params.get("chainId") {
         None | Some(Value::Null) => Ok(state.session.lock().await.chain()),
         Some(Value::String(s)) => {
@@ -1032,7 +1073,13 @@ async fn resolve_exec(
             let (facts, proof) = proof_carrying.expect("checked");
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
             let padded = node
-                .estimate_invoke_with_proof(sender, encoded_calldata, &nonce, facts, proof.expect("checked"))
+                .estimate_invoke_with_proof(
+                    sender,
+                    encoded_calldata,
+                    &nonce,
+                    facts,
+                    proof.expect("checked"),
+                )
                 .await
                 .map_err(|e| WalletRpcError::Node(e.to_string()))?;
             crate::fee::fit_bounds_to_balance(node.as_ref(), sender, padded, 0).await?
@@ -1143,7 +1190,13 @@ async fn sign_and_submit(
 fn summarize_calls(calls: &[Call]) -> String {
     calls
         .iter()
-        .map(|c| format!("→ {} :: selector {}", felt_hex(&c.to), felt_hex(&c.selector)))
+        .map(|c| {
+            format!(
+                "→ {} :: selector {}",
+                felt_hex(&c.to),
+                felt_hex(&c.selector)
+            )
+        })
         .collect::<Vec<_>>()
         .join("; ")
 }
@@ -1221,9 +1274,9 @@ async fn handle_add_declare(
         }
     };
     let compiled_class_hash = felt_from(
-        params
-            .get("compiled_class_hash")
-            .ok_or_else(|| WalletRpcError::InvalidRequest("missing 'compiled_class_hash'".into()))?,
+        params.get("compiled_class_hash").ok_or_else(|| {
+            WalletRpcError::InvalidRequest("missing 'compiled_class_hash'".into())
+        })?,
         "compiled_class_hash",
     )?;
     let contract_class_json = contract_class.as_ref().map(SierraClass::to_rpc_json);
@@ -1246,7 +1299,8 @@ async fn handle_add_declare(
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
             let cc = contract_class_json.as_ref().ok_or_else(|| {
                 WalletRpcError::InvalidRequest(
-                    "to estimate a declare, provide 'contract_class' (or pass resource_bounds)".into(),
+                    "to estimate a declare, provide 'contract_class' (or pass resource_bounds)"
+                        .into(),
                 )
             })?;
             let padded = node
@@ -1263,7 +1317,11 @@ async fn handle_add_declare(
         "wallet_addDeclareTransaction",
         format!(
             "{} class {} from {} on {}. Max fee: {}",
-            if submit { "Declare" } else { "Sign declaration of" },
+            if submit {
+                "Declare"
+            } else {
+                "Sign declaration of"
+            },
             felt_hex(&class_hash),
             account.address,
             chain_name(chain),
@@ -1285,7 +1343,13 @@ async fn handle_add_declare(
     };
     let signed = {
         let session = state.session.lock().await;
-        session.sign_declare_for(&account, &class_hash, &compiled_class_hash, chain, &params_v3)?
+        session.sign_declare_for(
+            &account,
+            &class_hash,
+            &compiled_class_hash,
+            chain,
+            &params_v3,
+        )?
     };
 
     if submit {
@@ -1294,7 +1358,14 @@ async fn handle_add_declare(
             WalletRpcError::InvalidRequest("submit:true requires 'contract_class'".into())
         })?;
         let hash = node
-            .add_declare(&sender, &compiled_class_hash, cc, &signed.signature, &nonce, &bounds)
+            .add_declare(
+                &sender,
+                &compiled_class_hash,
+                cc,
+                &signed.signature,
+                &nonce,
+                &bounds,
+            )
             .await
             .map_err(|e| crate::fee::broadcast_error(e, &bounds))?;
         return Ok(json!({
@@ -1342,7 +1413,11 @@ fn normalize_proof_b64(raw: &str) -> Result<String, WalletRpcError> {
             "proof is empty or all padding after trimming whitespace".into(),
         ));
     }
-    if pad > 2 || body.iter().any(|&b| !(b.is_ascii_alphanumeric() || b == b'+' || b == b'/')) {
+    if pad > 2
+        || body
+            .iter()
+            .any(|&b| !(b.is_ascii_alphanumeric() || b == b'+' || b == b'/'))
+    {
         return Err(WalletRpcError::InvalidRequest(
             "proof is not valid standard base64 (expected A-Za-z0-9+/ with optional trailing '='; \
              check for url-safe '-'/'_', embedded '=' padding, or stray characters)"
@@ -1370,7 +1445,11 @@ async fn handle_add_invoke(
             .map(|v| felt_from(v, "proof_facts element"))
             .collect::<Result<Vec<_>, _>>()?,
         None | Some(Value::Null) => Vec::new(),
-        _ => return Err(WalletRpcError::InvalidRequest("proof_facts must be an array".into())),
+        _ => {
+            return Err(WalletRpcError::InvalidRequest(
+                "proof_facts must be an array".into(),
+            ))
+        }
     };
     let proof: Option<String> = match params.get("proof").and_then(|v| v.as_str()) {
         Some(s) => Some(normalize_proof_b64(s)?),
@@ -1400,18 +1479,21 @@ async fn handle_add_invoke(
     // Nonce + fee: caller-supplied or node-resolved (before the prompt, so the
     // fee can be shown).
     let encoded = wallet_core::encode_calls(&calls);
-    let (nonce, bounds) =
-        resolve_exec(
-            state,
-            chain,
-            &sender,
-            &encoded,
-            params,
-            (!proof_facts.is_empty()).then_some((proof_facts.as_slice(), proof.as_deref())),
-        )
-        .await?;
+    let (nonce, bounds) = resolve_exec(
+        state,
+        chain,
+        &sender,
+        &encoded,
+        params,
+        (!proof_facts.is_empty()).then_some((proof_facts.as_slice(), proof.as_deref())),
+    )
+    .await?;
 
-    let kind = if proof_facts.is_empty() { "" } else { " (SNIP-36 proof-carrying)" };
+    let kind = if proof_facts.is_empty() {
+        ""
+    } else {
+        " (SNIP-36 proof-carrying)"
+    };
     let decision = gated_approval(
         state,
         client,
@@ -1432,7 +1514,18 @@ async fn handle_add_invoke(
         return Err(WalletRpcError::UserRefused);
     }
 
-    sign_and_submit(state, chain, &account, &calls, nonce, bounds, submit, proof_facts, proof).await
+    sign_and_submit(
+        state,
+        chain,
+        &account,
+        &calls,
+        nonce,
+        bounds,
+        submit,
+        proof_facts,
+        proof,
+    )
+    .await
 }
 
 /// Turn an agent's structured feedback into a **prefilled GitHub "new issue"
@@ -1479,7 +1572,9 @@ fn handle_report_issue(
     body.push_str(&format!(
         "---\n_Filed via {} `companion_reportIssue` by **{}** ({}). It is alpha — \
 review and edit before submitting, and remove anything sensitive._",
-        crate::PRODUCT_NAME, client.label, client.id
+        crate::PRODUCT_NAME,
+        client.label,
+        client.id
     ));
     // Keep the prefilled URL within practical browser/server limits (~8 KB once
     // encoded); the operator can add detail in the browser if it's clipped.
@@ -1500,8 +1595,8 @@ review and edit before submitting, and remove anything sensitive._",
         // Make it unambiguous that Bramble Companion posted nothing.
         "filed": false,
         "instructions": "Give this `url` to your operator. Opening it loads a prefilled GitHub \
-issue draft; they review, edit, and submit it in their browser. The companion does not file it for you, \
-and stores no GitHub credential."
+    issue draft; they review, edit, and submit it in their browser. The companion does not file it for you, \
+    and stores no GitHub credential."
     }))
 }
 
@@ -1524,14 +1619,22 @@ pub(crate) fn prover_or_err(state: &ServerState) -> Result<&prover::ProverState,
 /// `companion_prove` — enqueue an opaque, already-signed payload for on-device
 /// proving. Returns immediately with a job id; poll `companion_proveStatus`.
 /// The job belongs to the calling client: no other client can poll it.
-async fn handle_prove(state: &ServerState, client: &PairedClient, params: &Value) -> Result<Value, WalletRpcError> {
+async fn handle_prove(
+    state: &ServerState,
+    client: &PairedClient,
+    params: &Value,
+) -> Result<Value, WalletRpcError> {
     let prover = prover_or_err(state)?;
     let network = opt_param_str(params, "network").unwrap_or_else(|| "mainnet".into());
     let label = opt_param_str(params, "label");
     // `payload` is the opaque thing to prove; if absent, treat the whole params
     // object as the payload (mirrors the prover crate's generic contract).
-    let payload = params.get("payload").cloned().unwrap_or_else(|| params.clone());
-    let job_id = prover::enqueue_prove_as(prover, payload, label, network, Some(client.id.clone())).await;
+    let payload = params
+        .get("payload")
+        .cloned()
+        .unwrap_or_else(|| params.clone());
+    let job_id =
+        prover::enqueue_prove_as(prover, payload, label, network, Some(client.id.clone())).await;
     Ok(json!({
         "job_id": job_id,
         "status": "queued",
@@ -1551,14 +1654,19 @@ async fn handle_prove_status(
     let job_id = param_str(params, "job_id")?;
     match prover.jobs.get_for(&job_id, &client.id).await {
         Some(job) => Ok(json!(job)),
-        None => Err(WalletRpcError::InvalidRequest(format!("unknown job '{job_id}'"))),
+        None => Err(WalletRpcError::InvalidRequest(format!(
+            "unknown job '{job_id}'"
+        ))),
     }
 }
 
 /// `companion_proofActivity` — recent proving activity feed (most-recent
 /// first) of the jobs this client queued, like `companion_proveStatus`. The
 /// desktop's own feed (IPC) lists every job.
-async fn handle_proof_activity(state: &ServerState, client: &PairedClient) -> Result<Value, WalletRpcError> {
+async fn handle_proof_activity(
+    state: &ServerState,
+    client: &PairedClient,
+) -> Result<Value, WalletRpcError> {
     let prover = prover_or_err(state)?;
     Ok(json!({ "activity": prover.jobs.recent_activity_for(&client.id).await }))
 }
@@ -2022,9 +2130,18 @@ Deploy and fund it on {} first — it pays the transfer fee.",
         return Err(WalletRpcError::UserRefused);
     }
 
-    let mut result =
-        sign_and_submit(state, chain, &manager, &calls, nonce, bounds, submit, Vec::new(), None)
-            .await?;
+    let mut result = sign_and_submit(
+        state,
+        chain,
+        &manager,
+        &calls,
+        nonce,
+        bounds,
+        submit,
+        Vec::new(),
+        None,
+    )
+    .await?;
     // Annotate with funding-specific fields.
     if let Some(obj) = result.as_object_mut() {
         obj.insert("recipient".into(), json!(recipient_acct.address));
@@ -2063,9 +2180,8 @@ async fn handle_deploy_account(
                 .cloned(),
             None => reg.scoped_for(scope.as_deref()).next().cloned(),
         };
-        found.ok_or_else(|| {
-            WalletRpcError::InvalidRequest("no account in scope to deploy".into())
-        })?
+        found
+            .ok_or_else(|| WalletRpcError::InvalidRequest("no account in scope to deploy".into()))?
     };
 
     let chain = resolve_chain(state, params).await?;
@@ -2101,7 +2217,12 @@ async fn handle_deploy_account(
         None => {
             let node = state.node_for(chain).ok_or(WalletRpcError::NoNode)?;
             let padded = node
-                .estimate_deploy_account(&d.address, &d.class_hash, &d.constructor_calldata, &d.salt)
+                .estimate_deploy_account(
+                    &d.address,
+                    &d.class_hash,
+                    &d.constructor_calldata,
+                    &d.salt,
+                )
                 .await
                 .map_err(|e| WalletRpcError::Node(e.to_string()))?;
             // The undeployed account pays its own deploy fee.
@@ -2115,7 +2236,11 @@ async fn handle_deploy_account(
         "companion_deployAccount",
         format!(
             "{} account {} on {}. Max fee: {}",
-            if submit { "Deploy" } else { "Sign deployment of" },
+            if submit {
+                "Deploy"
+            } else {
+                "Sign deployment of"
+            },
             account.address,
             chain_name(chain),
             bounds_summary(&bounds)
@@ -2197,7 +2322,9 @@ async fn handle_create_agent_account(
 
     let mut session = state.session.lock().await;
     let account = session.create_agent_account(&client.id, label)?;
-    persist_registry(state, &mut session, |s| s.rollback_account(&account.address))?;
+    persist_registry(state, &mut session, |s| {
+        s.rollback_account(&account.address)
+    })?;
     Ok(account_to_json(&account))
 }
 
@@ -2211,7 +2338,9 @@ pub(crate) fn persist_registry(
     session: &mut WalletSession,
     rollback: impl FnOnce(&mut WalletSession),
 ) -> Result<(), WalletRpcError> {
-    let Some(store) = &state.vault_store else { return Ok(()) };
+    let Some(store) = &state.vault_store else {
+        return Ok(());
+    };
     let persisted = session.reseal().and_then(|vault| {
         store
             .save(&vault)

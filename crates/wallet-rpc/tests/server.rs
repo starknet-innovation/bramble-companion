@@ -56,30 +56,50 @@ async fn loopback_server_serves_requests_and_writes_port_lock() {
     let client = reqwest::Client::new();
 
     // Public method works without a token.
-    let status = rpc(&client, &url, None, json!({
-        "jsonrpc": "2.0", "id": 1, "method": "companion_getStatus", "params": {}
-    }))
+    let status = rpc(
+        &client,
+        &url,
+        None,
+        json!({
+            "jsonrpc": "2.0", "id": 1, "method": "companion_getStatus", "params": {}
+        }),
+    )
     .await;
     assert_eq!(status["result"]["network"], json!("SN_SEPOLIA"));
 
     // Unauthenticated protected call is rejected over the wire.
-    let unauth = rpc(&client, &url, None, json!({
-        "jsonrpc": "2.0", "id": 2, "method": "wallet_requestChainId", "params": {}
-    }))
+    let unauth = rpc(
+        &client,
+        &url,
+        None,
+        json!({
+            "jsonrpc": "2.0", "id": 2, "method": "wallet_requestChainId", "params": {}
+        }),
+    )
     .await;
     assert_eq!(unauth["error"]["code"], json!(118));
 
     // Pair, then make an authenticated call with the bearer token.
-    let paired = rpc(&client, &url, None, json!({
-        "jsonrpc": "2.0", "id": 3, "method": "companion_requestPairing",
-        "params": {"name": "smoke", "kind": "app"}
-    }))
+    let paired = rpc(
+        &client,
+        &url,
+        None,
+        json!({
+            "jsonrpc": "2.0", "id": 3, "method": "companion_requestPairing",
+            "params": {"name": "smoke", "kind": "app"}
+        }),
+    )
     .await;
     let token = paired["result"]["token"].as_str().unwrap().to_string();
 
-    let chain = rpc(&client, &url, Some(&token), json!({
-        "jsonrpc": "2.0", "id": 4, "method": "wallet_requestChainId", "params": {}
-    }))
+    let chain = rpc(
+        &client,
+        &url,
+        Some(&token),
+        json!({
+            "jsonrpc": "2.0", "id": 4, "method": "wallet_requestChainId", "params": {}
+        }),
+    )
     .await;
     assert!(chain["result"].as_str().unwrap().starts_with("0x"));
 
@@ -129,15 +149,27 @@ async fn usage_endpoint_is_open_and_self_describing() {
     assert_eq!(resp.status().as_u16(), 200);
     let doc: Value = resp.json().await.unwrap();
 
-    assert!(doc["service"].as_str().unwrap().contains(wallet_rpc::PRODUCT_NAME));
+    assert!(doc["service"]
+        .as_str()
+        .unwrap()
+        .contains(wallet_rpc::PRODUCT_NAME));
     let conf: Value =
         serde_json::from_str(include_str!("../../../desktop/src-tauri/tauri.conf.json")).unwrap();
-    assert_eq!(conf["productName"], wallet_rpc::PRODUCT_NAME, "bundle name and PRODUCT_NAME differ");
+    assert_eq!(
+        conf["productName"],
+        wallet_rpc::PRODUCT_NAME,
+        "bundle name and PRODUCT_NAME differ"
+    );
     assert!(doc["methods"].is_array());
     assert!(doc["quickstart"].is_array());
     // Core sections the agent contract must carry.
     for key in [
-        "transport", "concepts", "approval_model", "submit_model", "errors", "notes",
+        "transport",
+        "concepts",
+        "approval_model",
+        "submit_model",
+        "errors",
+        "notes",
         "alpha_notice",
     ] {
         assert!(!doc[key].is_null(), "usage doc missing '{key}'");
@@ -145,8 +177,14 @@ async fn usage_endpoint_is_open_and_self_describing() {
     // The alpha disclaimer carries the "don't work around it, report it" CTA and a
     // copy-pasteable feedback template the operator relays to the maintainer.
     let report = doc["alpha_notice"]["report_format"].as_str().unwrap();
-    assert!(report.contains("=== COMPANION-FEEDBACK ==="), "feedback template missing its sentinel");
-    assert!(doc["alpha_notice"]["do_not_work_around"].as_str().unwrap().contains("workaround"));
+    assert!(
+        report.contains("=== COMPANION-FEEDBACK ==="),
+        "feedback template missing its sentinel"
+    );
+    assert!(doc["alpha_notice"]["do_not_work_around"]
+        .as_str()
+        .unwrap()
+        .contains("workaround"));
     // The full method catalogue is present (every implemented method is listed,
     // so the doc can't silently drift from the dispatcher).
     let methods: Vec<String> = doc["methods"]
@@ -177,13 +215,23 @@ async fn usage_endpoint_is_open_and_self_describing() {
         "companion_strk20Prove",
         "companion_strk20ChannelKey",
     ] {
-        assert!(methods.iter().any(|m| m == expected), "usage doc missing method {expected}");
+        assert!(
+            methods.iter().any(|m| m == expected),
+            "usage doc missing method {expected}"
+        );
     }
     // Permission/grant model is documented (the key agent-facing behaviour).
-    assert!(doc["concepts"]["permissions"].as_str().unwrap().contains("grant"));
+    assert!(doc["concepts"]["permissions"]
+        .as_str()
+        .unwrap()
+        .contains("grant"));
 
     // /usage is an alias.
-    let resp2 = client.get(format!("http://{addr}/usage")).send().await.unwrap();
+    let resp2 = client
+        .get(format!("http://{addr}/usage"))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(resp2.status().as_u16(), 200);
 }
 

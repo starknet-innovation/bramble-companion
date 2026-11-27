@@ -58,7 +58,10 @@ pub enum WalletRpcError {
     Parse,
     /// `error` with a machine-readable `reason` (`data.reason` on the wire).
     /// Build it with [`WalletRpcError::with_reason`].
-    Reasoned { reason: &'static str, error: Box<WalletRpcError> },
+    Reasoned {
+        reason: &'static str,
+        error: Box<WalletRpcError>,
+    },
 }
 
 impl WalletRpcError {
@@ -67,7 +70,10 @@ impl WalletRpcError {
     pub fn with_reason(self, reason: &'static str) -> Self {
         match self {
             WalletRpcError::Reasoned { error, .. } => WalletRpcError::Reasoned { reason, error },
-            e => WalletRpcError::Reasoned { reason, error: Box::new(e) },
+            e => WalletRpcError::Reasoned {
+                reason,
+                error: Box::new(e),
+            },
         }
     }
 
@@ -122,7 +128,9 @@ impl WalletRpcError {
             WalletRpcError::Strk20NotRegistered(a) => {
                 format!("{a} has not registered a viewing key with the STRK20 pool (call companion_strk20Register)")
             }
-            WalletRpcError::InsufficientPrivateBalance(m) => format!("insufficient private balance: {m}"),
+            WalletRpcError::InsufficientPrivateBalance(m) => {
+                format!("insufficient private balance: {m}")
+            }
             WalletRpcError::PrivacyLeak(m) => format!("privacy leak: {m}"),
             WalletRpcError::ApiVersionNotSupported => "api version not supported".into(),
             WalletRpcError::Unknown(m) => format!("unknown error: {m}"),
@@ -186,15 +194,22 @@ mod tests {
     #[test]
     fn plain_errors_have_no_data_member() {
         let v = serde_json::to_value(WalletRpcError::Forbidden.to_object()).unwrap();
-        assert_eq!(v, json!({ "code": -32002, "message": "operation not permitted for this caller" }));
+        assert_eq!(
+            v,
+            json!({ "code": -32002, "message": "operation not permitted for this caller" })
+        );
     }
 
     #[test]
     fn a_reason_keeps_the_code_prefixes_the_message_and_adds_data() {
-        let e = WalletRpcError::Precondition("no class at 0x1".into()).with_reason("OWNER_NOT_DEPLOYED");
+        let e = WalletRpcError::Precondition("no class at 0x1".into())
+            .with_reason("OWNER_NOT_DEPLOYED");
         assert_eq!(e.code(), -32006);
         assert_eq!(e.reason(), Some("OWNER_NOT_DEPLOYED"));
-        assert_eq!(e.inner(), &WalletRpcError::Precondition("no class at 0x1".into()));
+        assert_eq!(
+            e.inner(),
+            &WalletRpcError::Precondition("no class at 0x1".into())
+        );
         let v = serde_json::to_value(e.to_object()).unwrap();
         assert_eq!(
             v,

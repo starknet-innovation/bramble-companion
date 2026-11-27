@@ -17,6 +17,7 @@ pub const PRODUCT_NAME: &str = "Bramble Companion";
 
 pub mod approval;
 pub mod auth;
+pub mod backoff;
 pub mod data_migration;
 pub mod dispatch;
 pub mod error;
@@ -28,13 +29,13 @@ pub mod server;
 pub mod session;
 pub mod store;
 pub mod strk20;
-pub mod backoff;
 pub mod usage;
 
 pub use approval::{
     ApprovalRequest, Approver, AutoApprover, ChannelApprover, Decision, PendingApproval,
 };
 pub use auth::{ClientInfo, ClientKind, ClientStore, PairedClient};
+pub use backoff::PassphraseBackoff;
 pub use dispatch::{dispatch, ServerState};
 pub use error::WalletRpcError;
 pub use fee::{fit_bounds_to_balance, FeeEstimate, INSUFFICIENT_BALANCE_FOR_BOUNDS};
@@ -44,6 +45,5 @@ pub use node::{
     declare_v3_tx_json, invoke_v3_tx_json, FeeBounds, HttpStarknetRpc, NodeError, StarknetRpc,
 };
 pub use server::{bind_loopback, router, transport_guard, write_port_lock};
-pub use backoff::PassphraseBackoff;
 pub use session::{reveal_for_session, reveal_mnemonic, VaultContents, WalletSession};
 pub use store::VaultStore;

@@ -587,7 +587,9 @@ pub async fn prove(
             job_id,
             scope,
         };
-        guard.check_wiped().map_err(|e| failure("WIPED_ON_LOCK", e_text(&e)))?;
+        guard
+            .check_wiped()
+            .map_err(|e| failure("WIPED_ON_LOCK", e_text(&e)))?;
         target.guard = Some(guard);
         let hash = submit_from(&target, &submitter, &prepared, &[])
             .await
@@ -708,7 +710,12 @@ mod tests {
     fn reference_block_never_overflows_on_a_huge_block_number() {
         let e = reference_block(1000, Some(u64::MAX), 900, 450).unwrap_err();
         assert_eq!(e.reason(), Some("BLOCK_TOO_RECENT"));
-        assert!(e.message().contains(&format!("Retry in {} block", u64::MAX - 1000)), "{}", e.message());
+        assert!(
+            e.message()
+                .contains(&format!("Retry in {} block", u64::MAX - 1000)),
+            "{}",
+            e.message()
+        );
         let e = reference_block(5, Some(u64::MAX - 3), 0, 450).unwrap_err();
         assert_eq!(e.reason(), Some("BLOCK_TOO_RECENT"));
     }
@@ -729,10 +736,18 @@ mod tests {
         assert!(f.message.starts_with("OWNER_SIGNATURE_REJECTED: "));
         assert!(f.message.contains("reference block 77"));
         assert!(f.message.contains("make a new plan"));
-        assert!(!f.message.contains(&format!("{sk:#x}")) && !f.message.contains(&encoded), "{}", f.message);
+        assert!(
+            !f.message.contains(&format!("{sk:#x}")) && !f.message.contains(&encoded),
+            "{}",
+            f.message
+        );
         let f = prover_failure(&format!("boom {encoded}"), true, 77);
         assert_eq!(f.reason.as_deref(), Some("PROVING_FAILED"));
-        assert!(!f.message.contains(&encoded) && !f.message.contains("boom"), "{}", f.message);
+        assert!(
+            !f.message.contains(&encoded) && !f.message.contains("boom"),
+            "{}",
+            f.message
+        );
         let f = prover_failure("INVALID_SIGNATURE", false, 77);
         assert_eq!(f.reason.as_deref(), Some("INVALID_SIGNATURE"));
     }

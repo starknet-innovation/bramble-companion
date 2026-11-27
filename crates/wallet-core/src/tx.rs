@@ -12,8 +12,8 @@
 //! ```
 
 use krusty_kms::tx_hash::{
-    compute_declare_v3_hash, compute_deploy_account_v3_hash, compute_invoke_v3_hash_with_proof_facts,
-    DaMode, ResourceBounds,
+    compute_declare_v3_hash, compute_deploy_account_v3_hash,
+    compute_invoke_v3_hash_with_proof_facts, DaMode, ResourceBounds,
 };
 use krusty_kms_common::ChainId;
 use sha3::{Digest, Keccak256};

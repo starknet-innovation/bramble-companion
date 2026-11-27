@@ -22,7 +22,10 @@ use serde_json::Value;
 use tokio::sync::Notify;
 
 fn now_ms() -> u128 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 /// Lifecycle of a proving job, surfaced to pollers and the UI.
@@ -109,7 +112,10 @@ pub struct JobFailure {
 
 impl From<String> for JobFailure {
     fn from(message: String) -> Self {
-        JobFailure { reason: None, message }
+        JobFailure {
+            reason: None,
+            message,
+        }
     }
 }
 
@@ -151,7 +157,10 @@ impl Jobs {
     /// `start_seq` seeds the job-id counter (e.g. from existing storage) so ids
     /// don't collide with prior records across restarts.
     pub fn new(start_seq: u64) -> Self {
-        Jobs { inner: Mutex::new(Inner::default()), seq: AtomicU64::new(start_seq) }
+        Jobs {
+            inner: Mutex::new(Inner::default()),
+            seq: AtomicU64::new(start_seq),
+        }
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
@@ -212,7 +221,8 @@ impl Jobs {
                 job_id,
                 Err(JobFailure {
                     reason: Some("WIPED_ON_LOCK".into()),
-                    message: "the wallet locked while this job ran, so its result was discarded".into(),
+                    message: "the wallet locked while this job ran, so its result was discarded"
+                        .into(),
                 }),
             );
             return;
@@ -244,7 +254,10 @@ impl Jobs {
     /// jobs, read as unknown.
     pub async fn get_for(&self, job_id: &str, client_id: &str) -> Option<Job> {
         let mut g = self.lock();
-        let j = g.jobs.get_mut(job_id).filter(|j| j.client_id.as_deref() == Some(client_id))?;
+        let j = g
+            .jobs
+            .get_mut(job_id)
+            .filter(|j| j.client_id.as_deref() == Some(client_id))?;
         j.expire(now_ms());
         Some(j.clone())
     }
@@ -295,13 +308,20 @@ impl Jobs {
     /// Most-recent-first activity of the jobs `client_id` queued (JSON-RPC).
     pub async fn recent_activity_for(&self, client_id: &str) -> Vec<Activity> {
         let g = self.lock();
-        g.activity.iter().rev().filter(|a| a.client_id.as_deref() == Some(client_id)).cloned().collect()
+        g.activity
+            .iter()
+            .rev()
+            .filter(|a| a.client_id.as_deref() == Some(client_id))
+            .cloned()
+            .collect()
     }
 }
 
 fn finish(inner: &mut Inner, job_id: &str, outcome: Result<Value, JobFailure>) {
     inner.cancels.remove(job_id);
-    let Some(j) = inner.jobs.get_mut(job_id) else { return };
+    let Some(j) = inner.jobs.get_mut(job_id) else {
+        return;
+    };
     let now = now_ms();
     j.finished_at_ms = Some(now);
     match outcome {
@@ -341,7 +361,10 @@ mod tests {
     use serde_json::json;
 
     fn owned(client: &str, ttl: Option<u128>) -> JobOptions {
-        JobOptions { client_id: Some(client.into()), result_ttl_ms: ttl }
+        JobOptions {
+            client_id: Some(client.into()),
+            result_ttl_ms: ttl,
+        }
     }
 
     #[tokio::test]
@@ -405,10 +428,14 @@ mod tests {
         let running = jobs.create_with(None, owned("c", Some(3_600_000))).await;
         let kept = jobs.create_with(None, owned("c", None)).await;
         assert!(jobs.cancel_signal(&kept).is_none());
-        let signal = jobs.cancel_signal(&running).expect("ephemeral jobs have a signal");
+        let signal = jobs
+            .cancel_signal(&running)
+            .expect("ephemeral jobs have a signal");
         jobs.wipe_ephemeral();
         // The permit is stored: waiting after the wipe still completes.
-        tokio::time::timeout(std::time::Duration::from_secs(1), signal.notified()).await.expect("cancelled");
+        tokio::time::timeout(std::time::Duration::from_secs(1), signal.notified())
+            .await
+            .expect("cancelled");
         // A finished job has no signal left.
         jobs.fail(&running, "x".into()).await;
         assert!(jobs.cancel_signal(&running).is_none());
@@ -420,9 +447,19 @@ mod tests {
         let a = jobs.create_with(Some("A".into()), owned("c1", None)).await;
         let b = jobs.create_with(Some("B".into()), owned("c2", None)).await;
         let _untagged = jobs.create(Some("desk".into())).await;
-        let c1: Vec<String> = jobs.recent_activity_for("c1").await.into_iter().map(|x| x.job_id).collect();
+        let c1: Vec<String> = jobs
+            .recent_activity_for("c1")
+            .await
+            .into_iter()
+            .map(|x| x.job_id)
+            .collect();
         assert_eq!(c1, vec![a]);
-        let c2: Vec<String> = jobs.recent_activity_for("c2").await.into_iter().map(|x| x.job_id).collect();
+        let c2: Vec<String> = jobs
+            .recent_activity_for("c2")
+            .await
+            .into_iter()
+            .map(|x| x.job_id)
+            .collect();
         assert_eq!(c2, vec![b]);
         assert_eq!(jobs.recent_activity().await.len(), 3);
         let s = serde_json::to_string(&jobs.recent_activity().await).unwrap();

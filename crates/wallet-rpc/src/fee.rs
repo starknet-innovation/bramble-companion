@@ -89,7 +89,9 @@ const PRICE_HEADROOM_PCT: [u128; 3] = [
 
 fn pct(v: u128, pct: u128) -> u128 {
     // `v × pct / 100` without overflowing for any u128 `v`.
-    (v / 100).saturating_mul(pct).saturating_add((v % 100) * pct / 100)
+    (v / 100)
+        .saturating_mul(pct)
+        .saturating_add((v % 100) * pct / 100)
 }
 
 /// Inverse of [`pct`] for `pct ≥ 100`: the least `v` with `pct(v) ≥ padded`
@@ -98,7 +100,8 @@ fn unpct(padded: u128, pct: u128) -> u128 {
     // ceil(padded × 100 / pct), overflow-free.
     let q = padded / pct;
     let r = padded % pct;
-    q.saturating_mul(100).saturating_add((r * 100).div_ceil(pct))
+    q.saturating_mul(100)
+        .saturating_add((r * 100).div_ceil(pct))
 }
 
 /// A u128 gas amount as the u64 `max_amount` field, saturating instead of
@@ -225,7 +228,8 @@ pub fn fit_to_balance(est: &FeeEstimate, budget: u128) -> Fit {
     };
     // Interpolate one field from `floor` toward `padded` by `s_ppm` / 10^6.
     let lerp = |lo: u128, hi: u128, s_ppm: u128| {
-        lo + (hi.saturating_sub(lo) / PPM).saturating_mul(s_ppm) + (hi.saturating_sub(lo) % PPM) * s_ppm / PPM
+        lo + (hi.saturating_sub(lo) / PPM).saturating_mul(s_ppm)
+            + (hi.saturating_sub(lo) % PPM) * s_ppm / PPM
     };
     let tightened = |s_ppm: u128, shrink_amounts: bool| -> FeeBounds {
         let r = |i: usize| {
@@ -355,7 +359,10 @@ pub fn is_exceed_balance(text: &str) -> bool {
 fn refused_balance(text: &str) -> Option<u128> {
     let lower = text.to_ascii_lowercase();
     let start = lower.find("exceed balance (")? + "exceed balance (".len();
-    let digits: String = lower[start..].chars().take_while(char::is_ascii_digit).collect();
+    let digits: String = lower[start..]
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
     digits.parse().ok()
 }
 
@@ -436,7 +443,13 @@ mod tests {
             "overall_fee": "0x22c", "unit": "FRI",
         });
         let est = FeeEstimate::from_rpc(&v).unwrap();
-        assert_eq!(est.l2_gas, ResourceEstimate { amount: 100, price: 3 });
+        assert_eq!(
+            est.l2_gas,
+            ResourceEstimate {
+                amount: 100,
+                price: 3
+            }
+        );
         assert_eq!(est.fee(), 300 + 256);
         assert!(FeeEstimate::from_rpc(&json!({ "l1_gas_consumed": 5 })).is_err());
     }
@@ -555,7 +568,10 @@ mod tests {
         assert!(minimum > estimated);
         // Exactly the tightest bounds is enough.
         assert!(matches!(fit_to_balance(&est, minimum), Fit::Tightened(_)));
-        assert!(matches!(fit_to_balance(&FeeEstimate::default(), 0), Fit::Padded(_)));
+        assert!(matches!(
+            fit_to_balance(&FeeEstimate::default(), 0),
+            Fit::Padded(_)
+        ));
     }
 
     #[test]
@@ -569,7 +585,10 @@ mod tests {
         assert!(m.contains("balance 1.922662 STRK"));
         assert!(m.contains(&format!("max fee {} STRK", strk(max_fee(&bounds)))));
         // Other node errors stay -32004 with no reason.
-        let other = broadcast_error(r#"rpc: {"code":55,"message":"Account validation failed"}"#, &bounds);
+        let other = broadcast_error(
+            r#"rpc: {"code":55,"message":"Account validation failed"}"#,
+            &bounds,
+        );
         assert_eq!(other.code(), -32004);
         assert_eq!(other.reason(), None);
     }

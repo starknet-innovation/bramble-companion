@@ -42,12 +42,23 @@ fn sign_deploy_account_produces_hash_signature_and_deployment_fields() {
     let params = InvokeV3Params {
         nonce: Felt::ZERO,
         tip: 0,
-        l1_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 1 },
-        l2_gas: ResourceBounds { max_amount: 200_000, max_price_per_unit: 1 },
-        l1_data_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 1 },
+        l1_gas: ResourceBounds {
+            max_amount: 100,
+            max_price_per_unit: 1,
+        },
+        l2_gas: ResourceBounds {
+            max_amount: 200_000,
+            max_price_per_unit: 1,
+        },
+        l1_data_gas: ResourceBounds {
+            max_amount: 100,
+            max_price_per_unit: 1,
+        },
         ..Default::default()
     };
-    let signed = s.sign_deploy_account_for(&acct, s.chain(), &params).unwrap();
+    let signed = s
+        .sign_deploy_account_for(&acct, s.chain(), &params)
+        .unwrap();
 
     assert_ne!(signed.transaction_hash, Felt::ZERO);
     assert_ne!(signed.r, Felt::ZERO);
@@ -64,8 +75,12 @@ fn sign_deploy_account_produces_hash_signature_and_deployment_fields() {
 fn reveal_returns_the_phrase_when_the_passphrase_is_right() {
     use wallet_rpc::reveal_mnemonic;
 
-    let s =
-        WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "correct horse", Registry::default());
+    let s = WalletSession::new_unlocked(
+        ChainId::Sepolia,
+        TEST_MNEMONIC,
+        "correct horse",
+        Registry::default(),
+    );
     let vault = s.reseal().unwrap();
 
     let revealed = reveal_mnemonic(&vault, "correct horse").unwrap();
@@ -76,15 +91,22 @@ fn reveal_returns_the_phrase_when_the_passphrase_is_right() {
 fn reveal_rejects_a_wrong_passphrase() {
     use wallet_rpc::reveal_mnemonic;
 
-    let s =
-        WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "correct horse", Registry::default());
+    let s = WalletSession::new_unlocked(
+        ChainId::Sepolia,
+        TEST_MNEMONIC,
+        "correct horse",
+        Registry::default(),
+    );
     let vault = s.reseal().unwrap();
 
     // Re-authentication is the AEAD tag, not a comparison: a wrong passphrase
     // cannot decrypt, so there is no path that returns a phrase without it.
     assert!(reveal_mnemonic(&vault, "wrong").is_err());
     assert!(reveal_mnemonic(&vault, "").is_err());
-    assert!(reveal_mnemonic(&vault, "correct horse ").is_err(), "not trimmed or fuzzy-matched");
+    assert!(
+        reveal_mnemonic(&vault, "correct horse ").is_err(),
+        "not trimmed or fuzzy-matched"
+    );
 }
 
 /// Being unlocked must not be sufficient. The session already holds the
@@ -100,7 +122,10 @@ fn reveal_does_not_depend_on_session_state() {
     drop(s);
 
     // No session in scope at all; the vault and passphrase are the whole input.
-    assert_eq!(&*reveal_mnemonic(&vault, "pass").unwrap() as &str, TEST_MNEMONIC);
+    assert_eq!(
+        &*reveal_mnemonic(&vault, "pass").unwrap() as &str,
+        TEST_MNEMONIC
+    );
 }
 
 /// The desktop path: a locked session refuses even the right passphrase, and an
@@ -114,10 +139,16 @@ fn reveal_for_session_refuses_while_locked() {
     let vault = unlocked.reseal().unwrap();
 
     let locked = WalletSession::new_locked(ChainId::Sepolia);
-    assert!(matches!(reveal_for_session(&locked, &vault, "pass"), Err(WalletRpcError::Locked)));
+    assert!(matches!(
+        reveal_for_session(&locked, &vault, "pass"),
+        Err(WalletRpcError::Locked)
+    ));
 
     assert!(reveal_for_session(&unlocked, &vault, "wrong").is_err());
-    assert_eq!(&*reveal_for_session(&unlocked, &vault, "pass").unwrap() as &str, TEST_MNEMONIC);
+    assert_eq!(
+        &*reveal_for_session(&unlocked, &vault, "pass").unwrap() as &str,
+        TEST_MNEMONIC
+    );
 }
 
 // --- STRK20 owner records (#48) -------------------------------------------
@@ -129,32 +160,58 @@ fn reveal_for_session_refuses_while_locked() {
 fn strk20_owner_records_persist_in_the_sealed_registry() {
     use wallet_core::{OwnerController, Strk20Owner};
 
-    let mut s = WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "pass", Registry::default());
+    let mut s =
+        WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "pass", Registry::default());
     let controller = s.create_user_account("Main").unwrap();
     let record = Strk20Owner {
         owner: format!("0x{:064x}", 0xc0ffeeu64),
         chain: ChainId::Sepolia,
         pool: format!("0x{:064x}", 0x123u64),
-        controller: OwnerController { domain: controller.domain, index: controller.index, address: controller.address },
+        controller: OwnerController {
+            domain: controller.domain,
+            index: controller.index,
+            address: controller.address,
+        },
         client_id: None,
         label: "vault".into(),
     };
     assert!(s.add_strk20_owner(record.clone()).unwrap());
-    assert!(!s.add_strk20_owner(record.clone()).unwrap(), "same owner, chain, pool and scope");
+    assert!(
+        !s.add_strk20_owner(record.clone()).unwrap(),
+        "same owner, chain, pool and scope"
+    );
     // Another scope (an agent) may hold its own record for the same owner.
-    assert!(s.add_strk20_owner(Strk20Owner { client_id: Some("agent-1".into()), ..record.clone() }).unwrap());
+    assert!(s
+        .add_strk20_owner(Strk20Owner {
+            client_id: Some("agent-1".into()),
+            ..record.clone()
+        })
+        .unwrap());
 
     let vault = s.reseal().unwrap();
     let mut reopened = WalletSession::new_locked(ChainId::Sepolia);
     reopened.unlock(&vault, "pass").unwrap();
     let reg = reopened.registry().unwrap();
-    assert_eq!(reg.strk20_owners_for(None).collect::<Vec<_>>(), vec![&record]);
+    assert_eq!(
+        reg.strk20_owners_for(None).collect::<Vec<_>>(),
+        vec![&record]
+    );
     assert_eq!(reg.strk20_owners_for(Some("agent-1")).count(), 1);
     assert_eq!(reg.strk20_owners_for(Some("agent-2")).count(), 0);
 
     reopened.rollback_strk20_owner(&record);
-    assert_eq!(reopened.registry().unwrap().strk20_owners_for(None).count(), 0);
-    let removed = reopened.remove_strk20_owner(&record.owner, ChainId::Sepolia, &record.pool, Some("agent-1")).unwrap();
+    assert_eq!(
+        reopened.registry().unwrap().strk20_owners_for(None).count(),
+        0
+    );
+    let removed = reopened
+        .remove_strk20_owner(
+            &record.owner,
+            ChainId::Sepolia,
+            &record.pool,
+            Some("agent-1"),
+        )
+        .unwrap();
     assert!(removed.is_some());
     assert!(reopened.registry().unwrap().strk20_owners.is_empty());
 }
@@ -165,13 +222,26 @@ fn strk20_owner_records_persist_in_the_sealed_registry() {
 fn strk20_owner_viewing_key_comes_from_the_controller() {
     use wallet_core::Felt;
 
-    let mut s = WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "pass", Registry::default());
+    let mut s =
+        WalletSession::new_unlocked(ChainId::Sepolia, TEST_MNEMONIC, "pass", Registry::default());
     let controller = s.create_user_account("Main").unwrap();
     let pool = Felt::from_hex("0x123").unwrap();
     let owner = Felt::from_hex("0xc0ffee").unwrap();
-    let owner_key = s.strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner).unwrap();
-    assert_ne!(owner_key, s.strk20_viewing_key_for(&controller, ChainId::Sepolia, &pool).unwrap());
-    assert_eq!(owner_key, s.strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner).unwrap());
+    let owner_key = s
+        .strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner)
+        .unwrap();
+    assert_ne!(
+        owner_key,
+        s.strk20_viewing_key_for(&controller, ChainId::Sepolia, &pool)
+            .unwrap()
+    );
+    assert_eq!(
+        owner_key,
+        s.strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner)
+            .unwrap()
+    );
     s.lock();
-    assert!(s.strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner).is_err());
+    assert!(s
+        .strk20_owner_viewing_key_for(&controller, ChainId::Sepolia, &pool, &owner)
+        .is_err());
 }
