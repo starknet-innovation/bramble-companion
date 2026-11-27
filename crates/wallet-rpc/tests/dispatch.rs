@@ -5287,7 +5287,7 @@ async fn mainnet_is_off_by_default() {
 
 #[tokio::test]
 async fn mainnet_off_refuses_signing_and_estimates() {
-    let state = state_with_node_opts(Decision::Approve, "0x7", "0xabc", vec![], true);
+    let state = state_with(Decision::Approve, false);
     let (_, address) = user_registry();
     let token = pair(&state, "app").await;
 
@@ -5355,7 +5355,7 @@ async fn mainnet_off_refuses_mainnet_typed_data() {
 async fn mainnet_off_applies_to_the_default_network_too() {
     // Mainnet set as the default while on, then turned off: requests without a
     // chainId are refused rather than silently moved to Sepolia.
-    let state = state_with_node_opts(Decision::Approve, "0x7", "0xabc", vec![], true);
+    let state = state_with(Decision::Approve, false);
     let (_, address) = user_registry();
     let token = pair(&state, "app").await;
     state.set_mainnet_enabled(true);
