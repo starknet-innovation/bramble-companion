@@ -107,6 +107,35 @@ fn main() {
                 "entrypoint": "transfer"
             }
         }),
+        // `i128` in every JSON form starknet.js accepts (strings, both signs, and
+        // the type's limits). Rejected before krusty 3.1.0; see the git history
+        // of `known_divergences`.
+        serde_json::json!({
+            "types": {
+                "StarknetDomain": [
+                    {"name": "name", "type": "shortstring"},
+                    {"name": "version", "type": "shortstring"},
+                    {"name": "chainId", "type": "shortstring"},
+                    {"name": "revision", "type": "shortstring"}
+                ],
+                "Deltas": [
+                    {"name": "neg_str", "type": "i128"},
+                    {"name": "pos_str", "type": "i128"},
+                    {"name": "pos_num", "type": "i128"},
+                    {"name": "min", "type": "i128"},
+                    {"name": "max", "type": "i128"}
+                ]
+            },
+            "primaryType": "Deltas",
+            "domain": {"name": "deltas", "version": "1", "chainId": "SN_SEPOLIA", "revision": "1"},
+            "message": {
+                "neg_str": "-5",
+                "pos_str": "5",
+                "pos_num": 5,
+                "min": "-170141183460469231731687303715884105728",
+                "max": "170141183460469231731687303715884105727"
+            }
+        }),
     ];
     let typed_vectors: Vec<_> = typed
         .iter()
@@ -186,11 +215,7 @@ fn main() {
         "salt": "0x0",
         "vectors": entries,
         "typed_data_vectors": typed_vectors,
-        "known_divergences": [
-            "SNIP-12 rev 1 `i128`: krusty (via starknet-rust-core 0.19.1) accepts only a negative JSON number; \
-    it rejects strings (\"-5\", \"5\") and non-negative numbers (5), all of which starknet.js accepts. Bramble Companion refuses \
-    to sign such messages (fails closed); when it does sign, the digest matches."
-        ],
+        "known_divergences": [],
         "invoke_v3_vectors": invoke_vectors,
     });
     println!("{}", serde_json::to_string_pretty(&doc).unwrap());

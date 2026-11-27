@@ -14,15 +14,15 @@ repository = "https://github.com/starknet-innovation/bramble-companion"
 
 # krusty-kms is experimental and not published to crates.io. Pin to an exact
 # commit; bumps must go through review (see spec/wallet-companion-spec.md §14).
-# Pinned to krusty main 2b6b7b5 (2026-10-01). It includes krusty#111
-# (canonical SNIP-12 via starknet-rust-core's reference encoder), which fixed
-# `string` digests and `selector` support (bramble-companion#32), on top of the earlier
-# PR #36 prefix/shortstring fix (bramble-companion#7). Known gap at this pin: `i128` is
-# accepted only as a negative JSON number (fails closed; see the conformance
-# fixture's known_divergences).
+# Pinned to krusty v3.1.0 (0eee421, 2026-11-15): the commit Bramble's
+# `@starknetfoundation/krusty-kms-wasm@3.1.0` was built from, per that package's
+# npm SLSA provenance, and the commit tag v3.1.0 points at. Both wallets run the
+# same crypto source; move this pin when Bramble moves its package (#21).
+# The earlier `i128` gap is gone at this pin: every JSON form starknet.js
+# accepts now hashes, and the conformance vectors check it.
 [workspace.dependencies]
-krusty-kms = { git = "https://github.com/starknet-innovation/krusty-kms", rev = "2b6b7b5ea0ef33e3e088402ae9f65828b23a3b5f" }
-krusty-kms-common = { git = "https://github.com/starknet-innovation/krusty-kms", rev = "2b6b7b5ea0ef33e3e088402ae9f65828b23a3b5f" }
+krusty-kms = { git = "https://github.com/starknet-innovation/krusty-kms", rev = "0eee4214d5df9bb15909dc2205ebca11c64bd376" }
+krusty-kms-common = { git = "https://github.com/starknet-innovation/krusty-kms", rev = "0eee4214d5df9bb15909dc2205ebca11c64bd376" }
 # Must match krusty-kms's Felt type to avoid version-skew mismatches.
 starknet-types-core = { version = "0.2.0", features = ["hash"] }
 serde = { version = "1", features = ["derive"] }

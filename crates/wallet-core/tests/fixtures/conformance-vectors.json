@@ -216,11 +216,71 @@
         }
       },
       "message_hash": "0x004f1a7ccf16e7e401350819278a495b70de04c46f2cf48c1f51f5b54af33719"
+    },
+    {
+      "account_address": "0x0497e8446398aa1c30e6533382cedc0bca6df29f059fdbb227d9b727c04b7b4f",
+      "typed_data": {
+        "types": {
+          "StarknetDomain": [
+            {
+              "name": "name",
+              "type": "shortstring"
+            },
+            {
+              "name": "version",
+              "type": "shortstring"
+            },
+            {
+              "name": "chainId",
+              "type": "shortstring"
+            },
+            {
+              "name": "revision",
+              "type": "shortstring"
+            }
+          ],
+          "Deltas": [
+            {
+              "name": "neg_str",
+              "type": "i128"
+            },
+            {
+              "name": "pos_str",
+              "type": "i128"
+            },
+            {
+              "name": "pos_num",
+              "type": "i128"
+            },
+            {
+              "name": "min",
+              "type": "i128"
+            },
+            {
+              "name": "max",
+              "type": "i128"
+            }
+          ]
+        },
+        "primaryType": "Deltas",
+        "domain": {
+          "name": "deltas",
+          "version": "1",
+          "chainId": "SN_SEPOLIA",
+          "revision": "1"
+        },
+        "message": {
+          "neg_str": "-5",
+          "pos_str": "5",
+          "pos_num": 5,
+          "min": "-170141183460469231731687303715884105728",
+          "max": "170141183460469231731687303715884105727"
+        }
+      },
+      "message_hash": "0x054d26d72bfa2b21bb6ffe999f3910b9a68e5a7ec4a47526065d8a64f5a23de3"
     }
   ],
-  "known_divergences": [
-    "SNIP-12 rev 1 `i128`: krusty (via starknet-rust-core 0.19.1) accepts only a negative JSON number; it rejects strings (\"-5\", \"5\") and non-negative numbers (5), all of which starknet.js accepts. Bramble Companion refuses to sign such messages (fails closed); when it does sign, the digest matches."
-  ],
+  "known_divergences": [],
   "invoke_v3_vectors": [
     {
       "chain_id": "SN_SEPOLIA",
