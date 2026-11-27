@@ -280,6 +280,7 @@ async fn harness(
     );
     state.set_node(ChainId::Sepolia, Some(node.clone()));
     state.set_node(ChainId::Mainnet, Some(node));
+    state.set_mainnet_enabled(true);
     let token = call(
         &state,
         None,
@@ -625,6 +626,30 @@ async fn a_mainnet_screener_key_is_refused() {
     // PrepareInvoke takes the same path.
     let r = h.call("wallet_strk20PrepareInvoke", params).await;
     assert_eq!(code(&r), -32006);
+    assert!(h.prompt("wallet_strk20InvokeTransaction").is_empty());
+    assert!(node.submitted.lock().unwrap().is_empty());
+}
+
+/// With mainnet turned off (#79), STRK20 requests on mainnet are refused before
+/// any prompt or node call.
+#[tokio::test]
+async fn mainnet_off_refuses_strk20() {
+    let node = PoolNode::new(true, screener_public_key());
+    let h = harness("mainnet-off", node.clone(), &[], |s| {
+        s.mainnet.strk20.pool = TEST_POOL.into();
+    })
+    .await;
+    h.state.set_mainnet_enabled(false);
+    let mut params = deposit();
+    params["chainId"] = json!("0x534e5f4d41494e"); // SN_MAIN
+    for method in [
+        "wallet_strk20InvokeTransaction",
+        "wallet_strk20PrepareInvoke",
+    ] {
+        let r = h.call(method, params.clone()).await;
+        assert_eq!(code(&r), -32006);
+        assert!(r.error.unwrap().message.contains("mainnet is turned off"));
+    }
     assert!(h.prompt("wallet_strk20InvokeTransaction").is_empty());
     assert!(node.submitted.lock().unwrap().is_empty());
 }

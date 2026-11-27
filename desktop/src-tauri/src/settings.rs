@@ -25,6 +25,11 @@ pub struct Settings {
     /// Auto-lock the wallet after this many minutes of inactivity. 0 = never.
     #[serde(default = "default_auto_lock_minutes")]
     pub auto_lock_minutes: u64,
+    /// Allow mainnet operations (#79). Off by default, including for a
+    /// `config.json` written before this field existed: the crypto path is
+    /// unaudited, so a mainnet RPC URL alone no longer enables mainnet.
+    #[serde(default)]
+    pub mainnet_enabled: bool,
 }
 
 impl Default for Settings {
@@ -33,6 +38,7 @@ impl Default for Settings {
             sepolia_rpc: String::new(),
             mainnet_rpc: String::new(),
             auto_lock_minutes: default_auto_lock_minutes(),
+            mainnet_enabled: false,
         }
     }
 }
@@ -87,4 +93,19 @@ pub fn save(path: &Path, settings: &Settings) -> std::io::Result<()> {
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mainnet_is_off_for_a_config_written_before_the_switch() {
+        // A 0.5.0 config.json with a mainnet RPC URL and no `mainnet_enabled`.
+        let old = r#"{ "sepolia_rpc": "", "mainnet_rpc": "https://mainnet.example", "auto_lock_minutes": 15 }"#;
+        let s: Settings = serde_json::from_str(old).unwrap();
+        assert!(!s.mainnet_enabled);
+        assert_eq!(s.mainnet_rpc, "https://mainnet.example");
+        assert!(!Settings::default().mainnet_enabled);
+    }
 }

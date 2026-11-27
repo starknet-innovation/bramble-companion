@@ -107,13 +107,13 @@ tauri's `image-png` feature.
 
 | Command | Purpose |
 |---|---|
-| `status` | locked / needs_onboarding / network / version / service_url / account count |
+| `status` | locked / needs_onboarding / network / version / service_url / account count / mainnet_enabled |
 | `generate(word_count)` | generate + stage a mnemonic, return it for one-time backup |
 | `import(phrase)` | validate + stage an existing mnemonic |
 | `finalize_setup(passphrase)` | encrypt staged mnemonic → write vault → unlock |
 | `unlock(passphrase)` / `lock` | open/close the vault |
-| `set_network(network)` | switch the active network (`"mainnet"`/`"testnet"`) — drives deploy/fund/sign + deploy-status |
-| `get_settings` / `set_settings` | read/write RPC URLs + `auto_lock_minutes` (`config.json`); `set_settings` rebuilds the node at runtime |
+| `set_network(network)` | switch the active network (`"mainnet"`/`"testnet"`) — drives deploy/fund/sign + deploy-status; refuses mainnet while it is off |
+| `get_settings` / `set_settings` | read/write RPC URLs, `auto_lock_minutes` and `mainnet_enabled` (`config.json`); `set_settings` rebuilds the node at runtime and applies the mainnet switch (turning it off moves a mainnet default back to Sepolia) |
 | `list_clients` / `grant_permission(days)` / `revoke_permission` | Agents-tab permission control |
 | `list_accounts` | registry accounts (empty while locked) |
 | `add_user_account(label)` | derive next user account, persist (rollback on failure); **logged** to Activity |
@@ -266,6 +266,23 @@ keyframe animations (the deploy wiggle) that don't read them.
 
 See [issues #18 and #19](https://github.com/starknet-innovation/bramble-companion/issues/18)
 and [`bramble-convergence.md`](../project/bramble-convergence.md) §5.5.
+
+## Mainnet is off by default
+
+Since #79, the wallet refuses every mainnet request until the user turns on
+**Settings → Mainnet → Allow mainnet** (`mainnet_enabled` in `config.json`). The
+check sits in the service (`ServerState::check_chain_allowed`, applied when a
+request's chain is resolved), so it covers paired agents and this app alike:
+signing, typed data with an `SN_MAIN` domain, broadcast, fee estimation, funding,
+deploys, STRK20, and switching the default network to mainnet. The refusal is
+`-32006` with a message that says mainnet is off.
+
+A `config.json` written before the switch existed has no `mainnet_enabled`, so
+mainnet is **off after upgrading** even if a mainnet RPC URL is set. The URL is
+kept; the user turns mainnet back on in Settings, after the warning shown there.
+
+`companion_prove` (proving an already-signed payload, no keys involved) is not
+gated.
 
 ## Upgrading from strkd
 

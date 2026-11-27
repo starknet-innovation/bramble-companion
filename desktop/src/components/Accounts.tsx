@@ -179,6 +179,8 @@ export function Accounts({ status, onChange }: { status: Status | null; onChange
         <button
           className={activeNet === "mainnet" ? "subtab active" : "subtab"}
           onClick={() => selectNetwork("mainnet")}
+          disabled={!status?.mainnet_enabled}
+          title={status?.mainnet_enabled ? undefined : "Mainnet is off. Turn it on in Settings."}
         >
           Mainnet
         </button>

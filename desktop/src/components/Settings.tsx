@@ -37,6 +37,7 @@ export function Settings({ onChange }: { onChange: () => void }) {
     sepolia_rpc: "",
     mainnet_rpc: "",
     auto_lock_minutes: 15,
+    mainnet_enabled: false,
   });
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState("");
@@ -148,6 +149,28 @@ export function Settings({ onChange }: { onChange: () => void }) {
           onChange={(e) => setSettings({ ...settings, mainnet_rpc: e.target.value })}
         />
       </label>
+
+      <h3>Mainnet</h3>
+      <p className="muted small">
+        Mainnet is off by default. While it is off, the wallet refuses every mainnet request —
+        signing, broadcasting, funding, deploys and STRK20 — from agents and from this app.
+      </p>
+      <label className="field checkbox">
+        <input
+          type="checkbox"
+          checked={settings.mainnet_enabled}
+          onChange={(e) => setSettings({ ...settings, mainnet_enabled: e.target.checked })}
+        />
+        <span>Allow mainnet</span>
+      </label>
+      {settings.mainnet_enabled && (
+        <p className="notice-experimental">
+          Mainnet moves real funds. Bramble Companion is experimental and its crypto path is
+          unaudited: use only a dedicated account holding amounts you can afford to lose, never a
+          seed that controls real savings. Paired agents can request mainnet operations while
+          this is on.
+        </p>
+      )}
 
       <h3>Security</h3>
       <label className="field">

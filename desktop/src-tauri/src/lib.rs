@@ -189,6 +189,8 @@ async fn status(state: State<'_, DesktopState>) -> Result<serde_json::Value, Str
         // When false, the wallet is sign-only (no broadcast / fee estimation):
         // set an RPC URL in Settings to enable. No URL echoed (it may embed an API key).
         "node_configured": state.server.has_node_for(session.chain()),
+        // Mainnet is refused everywhere until the user turns it on (#79).
+        "mainnet_enabled": state.server.mainnet_enabled(),
     }))
 }
 
@@ -328,6 +330,7 @@ async fn set_network(state: State<'_, DesktopState>, network: String) -> Result<
         "testnet" | "sepolia" | "sn_sepolia" => ChainId::Sepolia,
         other => return Err(format!("unknown network '{other}'")),
     };
+    state.server.check_chain_allowed(chain).map_err(|e| e.message())?;
     state.server.session.lock().await.set_chain(chain);
     Ok(())
 }
@@ -356,6 +359,15 @@ async fn sync_prover_rpc(prover: &ProverState, wallet: &Settings) {
 async fn set_settings(state: State<'_, DesktopState>, settings: Settings) -> Result<(), String> {
     settings.validate()?;
     settings::save(&state.config_path, &settings).map_err(|e| e.to_string())?;
+    // Mainnet on/off (#79). Turning it off moves a mainnet default back to
+    // Sepolia, so the desktop's own actions (which use the default) follow too.
+    state.server.set_mainnet_enabled(settings.mainnet_enabled);
+    if !settings.mainnet_enabled {
+        let mut session = state.server.session.lock().await;
+        if session.chain() == ChainId::Mainnet {
+            session.set_chain(ChainId::Sepolia);
+        }
+    }
     // Register a node for each network (so switchStarknetChain picks the right one).
     state
         .server
@@ -1141,6 +1153,8 @@ pub fn run() {
             if let Some(node) = saved.node_for(ChainId::Mainnet) {
                 state = state.with_node(ChainId::Mainnet, node);
             }
+            // Mainnet stays off until the user turns it on in Settings (#79).
+            state = state.with_mainnet_enabled(saved.mainnet_enabled);
             // Expose proving over the loopback service (companion_prove*).
             state = state.with_prover(prover_state.clone());
             let server = Arc::new(state);

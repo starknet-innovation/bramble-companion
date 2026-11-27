@@ -3,7 +3,7 @@
 //! request and returns a response.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
 use serde_json::{json, Value};
@@ -42,6 +42,12 @@ pub struct ServerState {
     /// The app's auto-lock task locks the wallet after this goes stale. Desktop
     /// status-polling (IPC, not RPC) deliberately does NOT touch it.
     last_activity_ms: AtomicU64,
+    /// Whether mainnet operations are allowed (#79). Off by default: the crypto
+    /// path is unaudited, so mainnet stays off until the user turns it on in
+    /// Settings. Checked in [`resolve_chain`], so every chain-scoped method
+    /// (signing, broadcast, fee estimation, funding, deploys, STRK20) refuses
+    /// mainnet while it is off, whoever the caller is.
+    mainnet_enabled: AtomicBool,
     /// GitHub repo (`owner/name`) that `companion_reportIssue` points its
     /// prefilled "new issue" links at. Not a secret; no token is involved.
     issue_repo: String,
@@ -78,6 +84,7 @@ impl ServerState {
             nodes: RwLock::new(HashMap::new()),
             watched_assets: RwLock::new(Vec::new()),
             last_activity_ms: AtomicU64::new(now_unix_ms()),
+            mainnet_enabled: AtomicBool::new(false),
             issue_repo: DEFAULT_ISSUE_REPO.to_string(),
             prover: None,
             api_version: "0.1.0".to_string(),
@@ -138,6 +145,32 @@ impl ServerState {
         self
     }
 
+    /// Allow or refuse mainnet operations at construction (see
+    /// [`ServerState::set_mainnet_enabled`]).
+    pub fn with_mainnet_enabled(self, enabled: bool) -> Self {
+        self.set_mainnet_enabled(enabled);
+        self
+    }
+
+    /// Allow or refuse mainnet operations at runtime (Settings → Mainnet).
+    /// Off by default.
+    pub fn set_mainnet_enabled(&self, enabled: bool) {
+        self.mainnet_enabled.store(enabled, Ordering::Relaxed);
+    }
+
+    /// Whether mainnet operations are allowed.
+    pub fn mainnet_enabled(&self) -> bool {
+        self.mainnet_enabled.load(Ordering::Relaxed)
+    }
+
+    /// Refuse `chain` if it is mainnet and mainnet is turned off.
+    pub fn check_chain_allowed(&self, chain: ChainId) -> Result<(), WalletRpcError> {
+        if chain == ChainId::Mainnet && !self.mainnet_enabled() {
+            return Err(WalletRpcError::Precondition(MAINNET_OFF.into()));
+        }
+        Ok(())
+    }
+
     /// Set or clear the node client for `chain` at runtime (settings panel).
     pub fn set_node(&self, chain: ChainId, node: Option<Arc<dyn StarknetRpc>>) {
         let mut nodes = self.nodes.write().unwrap();
@@ -182,6 +215,10 @@ impl ServerState {
         self.watched_assets.read().unwrap().clone()
     }
 }
+
+/// Why a mainnet request was refused while mainnet is turned off (#79).
+pub const MAINNET_OFF: &str = "mainnet is turned off in this wallet: Bramble Companion is experimental and its \
+     crypto path is unaudited. Use Sepolia (chainId SN_SEPOLIA). Only the user can turn mainnet on, in Settings";
 
 /// STRK fee-token contract address. At the time of writing this is the same on
 /// Starknet mainnet and Sepolia, but it is **not** treated as authoritative:
@@ -514,6 +551,7 @@ async fn handle(state: &ServerState, token: Option<&str>, req: Request) -> Handl
                 result: Ok(json!({
                     "locked": session.is_locked(),
                     "network": chain_name(session.chain()),
+                    "mainnet_enabled": state.mainnet_enabled(),
                     "api_version": state.api_version,
                     "grant": grant,
                 })),
@@ -815,6 +853,21 @@ async fn handle_deployment_data(
     }))
 }
 
+/// The chain a SNIP-12 document's `domain.chainId` names, if it is one we know.
+/// Accepts the shortstring form (`"SN_MAIN"`) and the felt form (`"0x534e…"`).
+fn typed_data_chain(typed_data_json: &str) -> Option<ChainId> {
+    let td: Value = serde_json::from_str(typed_data_json).ok()?;
+    let raw = td.get("domain")?.get("chainId")?.as_str()?.trim();
+    let felt = if raw.starts_with("0x") || raw.starts_with("0X") {
+        Felt::from_hex(raw).ok()?
+    } else if raw.len() <= 31 {
+        Felt::from_bytes_be_slice(raw.as_bytes())
+    } else {
+        return None;
+    };
+    ChainId::from_felt(&felt).ok()
+}
+
 async fn handle_sign_typed_data(
     state: &ServerState,
     client: &PairedClient,
@@ -831,6 +884,12 @@ async fn handle_sign_typed_data(
         other => serde_json::to_string(other)
             .map_err(|_| WalletRpcError::InvalidRequest("typed_data not serializable".into()))?,
     };
+
+    // A SNIP-12 domain names its chain; refuse mainnet messages while mainnet is
+    // off (#79). A domain without a recognised chain is not a mainnet message.
+    if let Some(chain) = typed_data_chain(&typed_data_json) {
+        state.check_chain_allowed(chain)?;
+    }
 
     // Resolve the account within the caller's scope (enforces that a client can
     // only sign with accounts it is allowed to use). Done under a brief lock; the
@@ -1019,8 +1078,8 @@ pub(crate) async fn resolve_chain(
     state: &ServerState,
     params: &Value,
 ) -> Result<ChainId, WalletRpcError> {
-    match params.get("chainId") {
-        None | Some(Value::Null) => Ok(state.session.lock().await.chain()),
+    let chain = match params.get("chainId") {
+        None | Some(Value::Null) => state.session.lock().await.chain(),
         Some(Value::String(s)) => {
             let felt = Felt::from_hex(s).map_err(|_| {
                 WalletRpcError::InvalidRequest(
@@ -1028,12 +1087,16 @@ pub(crate) async fn resolve_chain(
                         .into(),
                 )
             })?;
-            ChainId::from_felt(&felt).map_err(|_| WalletRpcError::ChainIdNotSupported)
+            ChainId::from_felt(&felt).map_err(|_| WalletRpcError::ChainIdNotSupported)?
         }
-        Some(_) => Err(WalletRpcError::InvalidRequest(
-            "chainId must be a felt-encoded string".into(),
-        )),
-    }
+        Some(_) => {
+            return Err(WalletRpcError::InvalidRequest(
+                "chainId must be a felt-encoded string".into(),
+            ))
+        }
+    };
+    state.check_chain_allowed(chain)?;
+    Ok(chain)
 }
 
 /// Resolve the nonce + fee bounds for an invoke: caller-supplied values win,
@@ -1946,6 +2009,7 @@ async fn handle_switch_chain(
     let felt = Felt::from_hex(&chain_id_str)
         .map_err(|_| WalletRpcError::InvalidRequest("invalid chainId".into()))?;
     let target = ChainId::from_felt(&felt).map_err(|_| WalletRpcError::ChainIdNotSupported)?;
+    state.check_chain_allowed(target)?;
 
     let decision = state
         .approver

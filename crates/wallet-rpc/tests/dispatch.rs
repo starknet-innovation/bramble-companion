@@ -1133,7 +1133,8 @@ async fn add_invoke_per_request_chain_id_changes_hash() {
         .unwrap()
         .to_string();
 
-    // Explicit chainId = SN_MAIN → different signed hash.
+    // Explicit chainId = SN_MAIN → different signed hash (mainnet turned on).
+    state.set_mainnet_enabled(true);
     let mut mainnet = invoke_params(&address);
     mainnet["chainId"] = json!("0x534e5f4d41494e");
     let r = call(&state, Some(&token), "wallet_addInvokeTransaction", mainnet).await;
@@ -1641,6 +1642,7 @@ async fn node_can_be_set_and_cleared_at_runtime() {
 #[tokio::test]
 async fn switch_chain_changes_active_network() {
     let state = state_with(Decision::Approve, false); // starts on Sepolia
+    state.set_mainnet_enabled(true);
     let token = pair(&state, "app").await;
 
     // SN_MAIN felt.
@@ -1675,6 +1677,7 @@ async fn switch_chain_rejects_unknown_chain() {
 #[tokio::test]
 async fn switch_chain_rejected_maps_to_113() {
     let state = state_rejecting(&["wallet_switchStarknetChain"]);
+    state.set_mainnet_enabled(true);
     let token = pair(&state, "app").await;
     let sn_main = format!("0x{:x}", wallet_core::Felt::from_bytes_be_slice(b"SN_MAIN"));
     let resp = call(
@@ -5255,4 +5258,115 @@ async fn proof_activity_is_scoped_to_the_client() {
         !list.is_empty() && list.iter().all(|x| x["label"] == json!("mine")),
         "{act_a}"
     );
+}
+
+// ── Mainnet off by default (#79) ─────────────────────────────────────────────
+
+const SN_MAIN_HEX: &str = "0x534e5f4d41494e";
+
+fn assert_mainnet_off(resp: &Response) {
+    assert_eq!(err_code(resp), -32006, "{:?}", resp.error);
+    assert!(
+        resp.error
+            .as_ref()
+            .unwrap()
+            .message
+            .contains("mainnet is turned off"),
+        "{:?}",
+        resp.error
+    );
+}
+
+#[tokio::test]
+async fn mainnet_is_off_by_default() {
+    let state = state_with(Decision::Approve, false);
+    assert!(!state.mainnet_enabled());
+    let status = call(&state, None, "companion_getStatus", json!({})).await;
+    assert_eq!(status.result.unwrap()["mainnet_enabled"], json!(false));
+}
+
+#[tokio::test]
+async fn mainnet_off_refuses_signing_and_estimates() {
+    let state = state_with_node_opts(Decision::Approve, "0x7", "0xabc", vec![], true);
+    let (_, address) = user_registry();
+    let token = pair(&state, "app").await;
+
+    for method in ["wallet_addInvokeTransaction", "companion_estimateFee"] {
+        let mut p = invoke_params(&address);
+        p["chainId"] = json!(SN_MAIN_HEX);
+        assert_mainnet_off(&call(&state, Some(&token), method, p).await);
+    }
+    // Sepolia still works.
+    let r = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        invoke_params(&address),
+    )
+    .await;
+    assert!(r.result.is_some(), "{:?}", r.error);
+}
+
+#[tokio::test]
+async fn mainnet_off_refuses_switching_to_mainnet() {
+    let state = state_with(Decision::Approve, false);
+    let token = pair(&state, "app").await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_switchStarknetChain",
+        json!({ "chainId": SN_MAIN_HEX }),
+    )
+    .await;
+    assert_mainnet_off(&resp);
+    let status = call(&state, None, "companion_getStatus", json!({})).await;
+    assert_eq!(status.result.unwrap()["network"], json!("SN_SEPOLIA"));
+}
+
+#[tokio::test]
+async fn mainnet_off_refuses_mainnet_typed_data() {
+    let state = state_with(Decision::Approve, false);
+    let (_, address) = user_registry();
+    let token = pair(&state, "app").await;
+    for chain_id in ["SN_MAIN", SN_MAIN_HEX] {
+        let mut td = sample_typed_data();
+        td["domain"]["chainId"] = json!(chain_id);
+        let resp = call(
+            &state,
+            Some(&token),
+            "wallet_signTypedData",
+            json!({ "account_address": address, "typed_data": td }),
+        )
+        .await;
+        assert_mainnet_off(&resp);
+    }
+    // A Sepolia domain still signs.
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_signTypedData",
+        json!({ "account_address": address, "typed_data": sample_typed_data() }),
+    )
+    .await;
+    assert!(resp.result.is_some(), "{:?}", resp.error);
+}
+
+#[tokio::test]
+async fn mainnet_off_applies_to_the_default_network_too() {
+    // Mainnet set as the default while on, then turned off: requests without a
+    // chainId are refused rather than silently moved to Sepolia.
+    let state = state_with_node_opts(Decision::Approve, "0x7", "0xabc", vec![], true);
+    let (_, address) = user_registry();
+    let token = pair(&state, "app").await;
+    state.set_mainnet_enabled(true);
+    state.session.lock().await.set_chain(ChainId::Mainnet);
+    state.set_mainnet_enabled(false);
+    let r = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        invoke_params(&address),
+    )
+    .await;
+    assert_mainnet_off(&r);
 }
