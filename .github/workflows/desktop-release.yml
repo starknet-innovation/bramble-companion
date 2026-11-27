@@ -158,6 +158,9 @@ jobs:
           releaseDraft: true      # human-in-the-loop: review before publishing
           prerelease: false
           releaseBody: |
+            **Experimental. Not for real funds.** The cryptography has not been audited. Use a
+            throwaway test seed only: never a real recovery phrase or one that controls funds.
+
             **These builds are not code-signed and not notarized.** macOS will block the app
             ("cannot be opened" or "is damaged"). Drag it to Applications, then either use
             System Settings → Privacy & Security → Open Anyway, or run

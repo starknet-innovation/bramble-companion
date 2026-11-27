@@ -11,7 +11,7 @@ import { Agents } from "./components/Agents";
 import { Proving } from "./components/Proving";
 import { Privacy } from "./components/Privacy";
 import { ApprovalDialog } from "./components/ApprovalDialog";
-import { PRODUCT_NAME } from "./brand";
+import { EXPERIMENTAL_NOTICE, PRODUCT_NAME } from "./brand";
 
 type Tab = "accounts" | "private" | "activity" | "agents" | "proving" | "connect" | "settings";
 
@@ -146,6 +146,9 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <span className="brand">{PRODUCT_NAME}</span>
+        <span className="tag-experimental" title={EXPERIMENTAL_NOTICE}>
+          Experimental
+        </span>
         <span className="spacer" />
         {status && (
           <span className="muted small">

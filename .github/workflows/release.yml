@@ -19,6 +19,8 @@
 #    - Provenance: actions/attest-build-provenance attests every artifact
 #      (verify with `gh attestation verify <file> -R starknet-innovation/bramble-companion`).
 #    - The release tag reaches the shell through `env`, not `${{ }}` in `run:`.
+#    - The release notes end with the "Experimental. Not for real funds." warning
+#      and the verification instructions.
 #
 # 2. The `tags:` glob below is narrowed from dist's default
 #       '**[0-9]+.[0-9]+.[0-9]+*'
@@ -338,6 +340,9 @@ jobs:
           cat >> $RUNNER_TEMP/notes.txt <<'NOTES'
 
           ---
+          **Experimental. Not for real funds.** The cryptography has not been audited. Use a
+          throwaway test seed only: never a real recovery phrase or one that controls funds.
+
           **Verify before you run.** Every file has a `.sha256` (and `sha256.sum` covers them all), and
           signed build provenance: `gh attestation verify <file> -R starknet-innovation/bramble-companion`.
           NOTES

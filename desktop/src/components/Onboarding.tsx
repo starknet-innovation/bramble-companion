@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { EXPERIMENTAL_NOTICE } from "../brand";
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<"choose" | "generate" | "import">("choose");
@@ -49,6 +50,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="panel">
         <h2>Welcome</h2>
         <p className="muted">Set up your Starknet wallet. The seed is encrypted on this device.</p>
+        <p className="notice-experimental">{EXPERIMENTAL_NOTICE}</p>
         <button className="primary" onClick={doGenerate}>
           Create a new wallet
         </button>

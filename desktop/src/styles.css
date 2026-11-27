@@ -161,6 +161,22 @@ body {
 .spacer {
   flex: 1;
 }
+.tag-experimental {
+  margin-left: var(--space-sm);
+  padding: 1px 6px;
+  border: 1px solid var(--err);
+  border-radius: var(--radius-full);
+  color: var(--err);
+  font-size: 11px;
+}
+.notice-experimental {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--err);
+  border-radius: var(--radius-sm);
+  color: var(--err);
+  font-size: var(--type-caption);
+}
 .muted {
   color: var(--muted);
 }
