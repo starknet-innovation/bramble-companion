@@ -353,6 +353,11 @@ button.small,
   cursor: pointer;
   font-size: 12px;
 }
+.subtab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .subtab.active {
   color: var(--text);
   border-color: var(--accent);
@@ -368,6 +373,12 @@ button.small,
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 
 .list {

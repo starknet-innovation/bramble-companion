@@ -94,7 +94,10 @@ pub fn usage_doc(api_version: &str, spec_versions: &[String]) -> Value {
     wallet_switchStarknetChain is DEPRECATED for agents — it mutates a single shared default for ALL \
     clients (one agent can switch it out from under another); the human sets the default in the app's \
     Settings. Broadcasting/fee-estimation need an RPC node configured for the chosen network (in the \
-    app's Settings); without one the wallet is sign-only on that network.",
+    app's Settings); without one the wallet is sign-only on that network. MAINNET IS OFF BY DEFAULT: \
+    while it is off, every mainnet request (signing, typed data with an SN_MAIN domain, broadcast, \
+    fee estimation, funding, deploys, STRK20, switching to SN_MAIN) is refused with -32006. Only the \
+    user can turn it on, in the app's Settings; companion_getStatus reports mainnet_enabled.",
             "funding": "Accounts pay their own fees. Get STRK with companion_requestFunding: it \
     transfers from the USER's manager account into one of YOUR accounts. This ALWAYS needs the user's \
     approval (it spends their funds) — see permissions.",

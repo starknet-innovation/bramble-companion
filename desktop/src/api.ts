@@ -15,6 +15,8 @@ export interface Status {
   service_url: string;
   accounts: number;
   node_configured: boolean;
+  /** Mainnet operations are refused until the user turns this on in Settings (#79). */
+  mainnet_enabled: boolean;
 }
 
 export interface Account {
@@ -49,6 +51,8 @@ export interface Settings {
   sepolia_rpc: string;
   mainnet_rpc: string;
   auto_lock_minutes: number;
+  /** Allow mainnet operations. Off by default (#79). */
+  mainnet_enabled: boolean;
 }
 
 export interface ClientInfo {
