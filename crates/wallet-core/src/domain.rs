@@ -105,7 +105,10 @@ impl Domain {
         if n < limit {
             Ok(())
         } else {
-            Err(CoreError::IndexOutOfRange { domain: self, index: n })
+            Err(CoreError::IndexOutOfRange {
+                domain: self,
+                index: n,
+            })
         }
     }
 

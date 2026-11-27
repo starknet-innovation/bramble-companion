@@ -14,7 +14,11 @@ use prover::{build_prover_state, enqueue_prove, Job, JobStatus, ProverConfig, Pr
 use serde_json::json;
 
 fn temp_dir(tag: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("bramble-companion-prover-test-{}-{}", tag, std::process::id()));
+    let d = std::env::temp_dir().join(format!(
+        "bramble-companion-prover-test-{}-{}",
+        tag,
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
     d
@@ -37,18 +41,32 @@ async fn run_to_terminal(state: &ProverState, job_id: &str) -> Job {
 async fn unconfigured_backend_fails_with_clear_error_and_persists() {
     let data_dir = temp_dir("remote-nourl");
     // `remote` backend, no prover URL set for any network → no real proof possible.
-    let cfg = ProverConfig { prover_backend: "remote".into() };
+    let cfg = ProverConfig {
+        prover_backend: "remote".into(),
+    };
     let state = build_prover_state(data_dir.clone(), &cfg);
 
-    let job_id =
-        enqueue_prove(&state, json!({ "transaction": { "x": 1 } }), Some("t".into()), "testnet".into())
-            .await;
+    let job_id = enqueue_prove(
+        &state,
+        json!({ "transaction": { "x": 1 } }),
+        Some("t".into()),
+        "testnet".into(),
+    )
+    .await;
     let job = run_to_terminal(&state, &job_id).await;
 
     // No fake proof — it fails honestly with an actionable message.
-    assert_eq!(job.status, JobStatus::Failed, "an unconfigured backend must not fake a proof");
+    assert_eq!(
+        job.status,
+        JobStatus::Failed,
+        "an unconfigured backend must not fake a proof"
+    );
     assert!(job.result.is_none());
-    assert!(job.error.as_deref().unwrap_or_default().contains("no remote prover configured"));
+    assert!(job
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("no remote prover configured"));
 
     // The failure is still recorded to storage (audit trail), as a failed record.
     let rec = state.storage.get_record(&job_id).expect("record persisted");
@@ -64,7 +82,9 @@ async fn unconfigured_backend_fails_with_clear_error_and_persists() {
 #[tokio::test]
 async fn job_counter_seeds_past_existing_records() {
     let data_dir = temp_dir("seed");
-    let cfg = ProverConfig { prover_backend: "remote".into() };
+    let cfg = ProverConfig {
+        prover_backend: "remote".into(),
+    };
 
     // First state proves one job (it fails, but a p0.json record is written).
     {
@@ -89,7 +109,9 @@ struct Canned(std::sync::Mutex<Option<serde_json::Value>>);
 impl prover::Prover for Canned {
     async fn prove(&self, req: prover::ProveRequest) -> Result<prover::ProveResult, String> {
         *self.0.lock().unwrap() = Some(req.payload);
-        Ok(prover::ProveResult { proof: json!({ "proof": "0xp" }) })
+        Ok(prover::ProveResult {
+            proof: json!({ "proof": "0xp" }),
+        })
     }
     fn kind(&self) -> &'static str {
         "canned"
@@ -125,10 +147,15 @@ async fn unrecorded_jobs_write_nothing_and_belong_to_their_client() {
     assert_eq!(job.status, JobStatus::Succeeded);
     assert_eq!(job.result, Some(json!({ "wrapped": { "proof": "0xp" } })));
     assert!(job.result_expires_at_ms.is_some());
-    assert!(backend.0.lock().unwrap().is_some(), "the prover got the payload");
+    assert!(
+        backend.0.lock().unwrap().is_some(),
+        "the prover got the payload"
+    );
     assert_eq!(state.storage.stats().records, 0);
     assert!(state.storage.get_record(&id).is_none());
-    let on_disk = std::fs::read_dir(data_dir.join("storage")).map(|d| d.count()).unwrap_or(0);
+    let on_disk = std::fs::read_dir(data_dir.join("storage"))
+        .map(|d| d.count())
+        .unwrap_or(0);
     assert_eq!(on_disk, 0);
     assert!(state.jobs.get_for(&id, "client-a").await.is_some());
     assert!(state.jobs.get_for(&id, "client-b").await.is_none());
@@ -176,10 +203,17 @@ async fn locking_cancels_running_unrecorded_jobs() {
     };
     let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let f = finished.clone();
-    let id = prover::enqueue_prove_unrecorded(&state, json!({}), None, "testnet".into(), Some("c".into()), move |_, _| async move {
-        f.store(true, std::sync::atomic::Ordering::SeqCst);
-        Ok(json!(1))
-    })
+    let id = prover::enqueue_prove_unrecorded(
+        &state,
+        json!({}),
+        None,
+        "testnet".into(),
+        Some("c".into()),
+        move |_, _| async move {
+            f.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(json!(1))
+        },
+    )
     .await;
     // Let it start proving, then lock.
     for _ in 0..100 {
@@ -192,16 +226,27 @@ async fn locking_cancels_running_unrecorded_jobs() {
     let job = run_to_terminal(&state, &id).await;
     assert_eq!(job.status, JobStatus::Failed);
     assert_eq!(job.error_reason.as_deref(), Some("WIPED_ON_LOCK"));
-    assert!(dropped.load(std::sync::atomic::Ordering::SeqCst), "the prover was stopped");
-    assert!(!finished.load(std::sync::atomic::Ordering::SeqCst), "finish must not run");
+    assert!(
+        dropped.load(std::sync::atomic::Ordering::SeqCst),
+        "the prover was stopped"
+    );
+    assert!(
+        !finished.load(std::sync::atomic::Ordering::SeqCst),
+        "finish must not run"
+    );
 
     // The one-shot path.
     dropped.store(false, std::sync::atomic::Ordering::SeqCst);
     let st = state.clone();
-    let task = tokio::spawn(async move { prover::prove_unrecorded(&st, json!({}), None, "testnet".into()).await });
+    let task = tokio::spawn(async move {
+        prover::prove_unrecorded(&st, json!({}), None, "testnet".into()).await
+    });
     tokio::time::sleep(Duration::from_millis(30)).await;
     state.jobs.wipe_ephemeral();
-    let res = tokio::time::timeout(Duration::from_secs(5), task).await.expect("stopped").unwrap();
+    let res = tokio::time::timeout(Duration::from_secs(5), task)
+        .await
+        .expect("stopped")
+        .unwrap();
     assert_eq!(res.unwrap_err(), prover::WIPED_MESSAGE);
     assert!(dropped.load(std::sync::atomic::Ordering::SeqCst));
     let _ = std::fs::remove_dir_all(&data_dir);

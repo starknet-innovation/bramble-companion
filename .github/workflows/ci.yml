@@ -43,7 +43,12 @@ jobs:
         uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
           toolchain: stable
-          components: clippy
+          components: clippy, rustfmt
+
+      # rustfmt's default style is stable across releases, so this does not
+      # start failing on untouched code when `stable` moves.
+      - name: Format
+        run: cargo fmt --all --check
 
       # The first build fetches krusty-kms from git (pinned commit), so this
       # needs network access.

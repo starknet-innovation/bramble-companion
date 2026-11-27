@@ -21,40 +21,40 @@ pub fn usage_doc(api_version: &str, spec_versions: &[String]) -> Value {
         "wallet_api_version": api_version,
         "supported_specs": spec_versions,
         "summary": "A local wallet that holds Starknet accounts and signs on your behalf. \
-By default every sensitive action (signing, funding, account creation) pops a confirmation on \
-the user's screen and only proceeds if the human approves. Private keys never leave the wallet \
-— you get signatures, signed transactions, and (when a node is configured) on-chain broadcasts, \
-never keys. It also PROVES SNIP-36 transactions on-device (sign + prove a private virtual tx in \
-one call, then broadcast the verifier tx) — see concepts.proving + snip36_proving.",
+    By default every sensitive action (signing, funding, account creation) pops a confirmation on \
+    the user's screen and only proceeds if the human approves. Private keys never leave the wallet \
+    — you get signatures, signed transactions, and (when a node is configured) on-chain broadcasts, \
+    never keys. It also PROVES SNIP-36 transactions on-device (sign + prove a private virtual tx in \
+    one call, then broadcast the verifier tx) — see concepts.proving + snip36_proving.",
 
         "alpha_notice": {
             "status": "The companion is ALPHA software under active development. Expect missing methods, \
-rough edges, partial features, and capabilities that simply do not exist yet.",
+    rough edges, partial features, and capabilities that simply do not exist yet.",
             "do_not_work_around": "If you hit a limitation — a missing method, a confusing or \
-unexpected error, a parameter that isn't accepted, or behaviour that blocks your task — DO NOT \
-invent a workaround, fake or guess a result, fall back to handling keys/seeds/signing yourself, \
-or silently abandon the step. A workaround hides the gap and makes it permanent. STOP and report \
-it instead. The maintainer reads these reports and fixes the companion, so a clear report is the FASTEST \
-path to the capability you want.",
+    unexpected error, a parameter that isn't accepted, or behaviour that blocks your task — DO NOT \
+    invent a workaround, fake or guess a result, fall back to handling keys/seeds/signing yourself, \
+    or silently abandon the step. A workaround hides the gap and makes it permanent. STOP and report \
+    it instead. The maintainer reads these reports and fixes the companion, so a clear report is the FASTEST \
+    path to the capability you want.",
             "call_to_action": "Tell your operator (the human running the companion) exactly what you need, \
-using the report format below. Emit the filled-in block VERBATIM in your reply to them — don't \
-just mention it in passing. They relay it to the maintainer.",
+    using the report format below. Emit the filled-in block VERBATIM in your reply to them — don't \
+    just mention it in passing. They relay it to the maintainer.",
             "github_shortcut": "Faster path when your operator can reach the repo: call \
-companion_reportIssue with these same fields and you get back a PREFILLED GitHub new-issue `url`. \
-Hand them the url — they open it, review/edit, and submit in their own browser. The companion files nothing \
-itself and holds no GitHub token. The COMPANION-FEEDBACK block below is the universal fallback when \
-they can't (or don't want to) use GitHub.",
+    companion_reportIssue with these same fields and you get back a PREFILLED GitHub new-issue `url`. \
+    Hand them the url — they open it, review/edit, and submit in their own browser. The companion files nothing \
+    itself and holds no GitHub token. The COMPANION-FEEDBACK block below is the universal fallback when \
+    they can't (or don't want to) use GitHub.",
             "report_format": "Copy this block, fill every field, and hand it to your operator verbatim:\n\n\
-=== COMPANION-FEEDBACK ===\n\
-goal:        <the task you were trying to accomplish, one line>\n\
-attempted:   <method(s) + params you called — or \"no method exists for this\">\n\
-observed:    <the exact JSON-RPC error code + message, or \"capability missing\">\n\
-limitation:  <what the companion could not do, stated plainly>\n\
-needed:      <the specific method / param / behaviour that would unblock you>\n\
-impact:      <blocked | degraded | cosmetic> — <what you could NOT do as a result>\n\
-workaround_avoided: <what you were tempted to do instead, so we can design it away; \"none\" if N/A>\n\
-context:     v<version> · network <from companion_getStatus> · <UTC timestamp>\n\
-=== END ===",
+    === COMPANION-FEEDBACK ===\n\
+    goal:        <the task you were trying to accomplish, one line>\n\
+    attempted:   <method(s) + params you called — or \"no method exists for this\">\n\
+    observed:    <the exact JSON-RPC error code + message, or \"capability missing\">\n\
+    limitation:  <what the companion could not do, stated plainly>\n\
+    needed:      <the specific method / param / behaviour that would unblock you>\n\
+    impact:      <blocked | degraded | cosmetic> — <what you could NOT do as a result>\n\
+    workaround_avoided: <what you were tempted to do instead, so we can design it away; \"none\" if N/A>\n\
+    context:     v<version> · network <from companion_getStatus> · <UTC timestamp>\n\
+    === END ===",
             "guidance": [
                 "One report per distinct limitation — don't batch unrelated gaps into one block.",
                 "Be concrete in `needed`: 'a companion_getBalance {address} method' beats 'better balance support'.",
@@ -65,9 +65,9 @@ context:     v<version> · network <from companion_getStatus> · <UTC timestamp>
         },
 
         "discovery": "This wallet runs a loopback service. The desktop app writes its bound port \
-to `port.lock` in the app data dir as {port, nonce} — the port is stable across restarts, so once \
-you've discovered the URL you may cache it. GET / (this document) is how a client learns the API \
-once it has the URL.",
+    to `port.lock` in the app data dir as {port, nonce} — the port is stable across restarts, so once \
+    you've discovered the URL you may cache it. GET / (this document) is how a client learns the API \
+    once it has the URL.",
 
         "transport": {
             "protocol": "JSON-RPC 2.0 over HTTP POST to / (this base URL). GET / returns this doc.",
@@ -77,57 +77,57 @@ once it has the URL.",
                 "Content-Type": "application/json"
             },
             "rejected": "Requests carrying an Origin/Referer header, or a non-loopback Host, or no \
-X-Companion-Client are rejected with HTTP 403 / error -32003 (CSRF & DNS-rebinding guard). Callers \
-are expected to be local native processes."
+    X-Companion-Client are rejected with HTTP 403 / error -32003 (CSRF & DNS-rebinding guard). Callers \
+    are expected to be local native processes."
         },
 
         "concepts": {
             "accounts": "All accounts derive from one seed. As an agent you can only see and use \
-accounts YOU created (companion_createAgentAccount); requestAccounts/listAccounts are scoped to \
-them. A new account is counterfactual (off-chain) until you deploy it (companion_deployAccount). \
-An account's address is identical on Mainnet and Sepolia.",
+    accounts YOU created (companion_createAgentAccount); requestAccounts/listAccounts are scoped to \
+    them. A new account is counterfactual (off-chain) until you deploy it (companion_deployAccount). \
+    An account's address is identical on Mainnet and Sepolia.",
             "networks": "Pick the network PER REQUEST: pass an optional chainId (felt-encoded, \
-e.g. SN_SEPOLIA / SN_MAIN) to the operational methods (wallet_addInvokeTransaction, \
-wallet_addDeclareTransaction, companion_deployAccount, companion_estimateFee, \
-companion_requestFunding). Omit it to use the wallet's default network. This is the recommended, \
-race-free way to choose a chain. wallet_requestChainId reports the current default. \
-wallet_switchStarknetChain is DEPRECATED for agents — it mutates a single shared default for ALL \
-clients (one agent can switch it out from under another); the human sets the default in the app's \
-Settings. Broadcasting/fee-estimation need an RPC node configured for the chosen network (in the \
-app's Settings); without one the wallet is sign-only on that network.",
+    e.g. SN_SEPOLIA / SN_MAIN) to the operational methods (wallet_addInvokeTransaction, \
+    wallet_addDeclareTransaction, companion_deployAccount, companion_estimateFee, \
+    companion_requestFunding). Omit it to use the wallet's default network. This is the recommended, \
+    race-free way to choose a chain. wallet_requestChainId reports the current default. \
+    wallet_switchStarknetChain is DEPRECATED for agents — it mutates a single shared default for ALL \
+    clients (one agent can switch it out from under another); the human sets the default in the app's \
+    Settings. Broadcasting/fee-estimation need an RPC node configured for the chosen network (in the \
+    app's Settings); without one the wallet is sign-only on that network.",
             "funding": "Accounts pay their own fees. Get STRK with companion_requestFunding: it \
-transfers from the USER's manager account into one of YOUR accounts. This ALWAYS needs the user's \
-approval (it spends their funds) — see permissions.",
+    transfers from the USER's manager account into one of YOUR accounts. This ALWAYS needs the user's \
+    approval (it spends their funds) — see permissions.",
             "permissions": "By default every prompts:true call waits for the user. The user MAY \
-grant your client a time-bounded auto-approval window (up to 3 months, revocable) — then your \
-own-account operations (sign/invoke/declare/deploy/create) run WITHOUT a prompt. \
-companion_requestFunding ALWAYS prompts, grant or not. Check companion_getStatus.grant to see if a \
-grant is active; request one yourself with companion_requestGrant (always prompts).",
+    grant your client a time-bounded auto-approval window (up to 3 months, revocable) — then your \
+    own-account operations (sign/invoke/declare/deploy/create) run WITHOUT a prompt. \
+    companion_requestFunding ALWAYS prompts, grant or not. Check companion_getStatus.grant to see if a \
+    grant is active; request one yourself with companion_requestGrant (always prompts).",
             "proving": "The companion bundles an ON-DEVICE prover for SNIP-36 (prove a private Starknet \
-computation off-chain, verify only the result on-chain). The prover holds NO keys — it proves an \
-ALREADY-SIGNED transaction. SNIP-36 is TWO transactions: (Tx A) a PRIVATE virtual invoke (e.g. \
-your contract's create_proof(public, private)) that is signed + proven off-chain and NEVER \
-broadcast; (Tx B) a verifier invoke (e.g. verify_result(public_message)) broadcast on-chain \
-carrying proof_facts + proof. Fastest path: companion_signAndProve signs Tx A and proves it in one \
-call (your private inputs never leave this machine), then you broadcast Tx B yourself with \
-wallet_addInvokeTransaction {proof_facts, proof, submit:true}. See the snip36_proving flow below. \
-CRITICAL: a virtual tx carries PRIVATE calldata, so you MUST pass explicit resource_bounds — the companion \
-refuses to fee-estimate it (estimating online would send your private inputs to the RPC node). \
-Tx A is NOT proof-carrying (proof_facts are an OUTPUT of proving, not in Tx A's hash). Proving \
-needs the native prover (bundled on-device) or a configured remote prover, plus a per-network RPC, \
-set in the app's Settings. There is NO mock/fake proof: an unconfigured backend FAILS the prove \
-with a clear error rather than returning a fake."
+    computation off-chain, verify only the result on-chain). The prover holds NO keys — it proves an \
+    ALREADY-SIGNED transaction. SNIP-36 is TWO transactions: (Tx A) a PRIVATE virtual invoke (e.g. \
+    your contract's create_proof(public, private)) that is signed + proven off-chain and NEVER \
+    broadcast; (Tx B) a verifier invoke (e.g. verify_result(public_message)) broadcast on-chain \
+    carrying proof_facts + proof. Fastest path: companion_signAndProve signs Tx A and proves it in one \
+    call (your private inputs never leave this machine), then you broadcast Tx B yourself with \
+    wallet_addInvokeTransaction {proof_facts, proof, submit:true}. See the snip36_proving flow below. \
+    CRITICAL: a virtual tx carries PRIVATE calldata, so you MUST pass explicit resource_bounds — the companion \
+    refuses to fee-estimate it (estimating online would send your private inputs to the RPC node). \
+    Tx A is NOT proof-carrying (proof_facts are an OUTPUT of proving, not in Tx A's hash). Proving \
+    needs the native prover (bundled on-device) or a configured remote prover, plus a per-network RPC, \
+    set in the app's Settings. There is NO mock/fake proof: an unconfigured backend FAILS the prove \
+    with a clear error rather than returning a fake."
         },
 
         "approval_model": "prompts:true means the call blocks until the user clicks Approve/Reject \
-in the menu bar (auto-rejected after ~60s → error 113), UNLESS your client holds an active grant \
-(funding still always prompts). Expect human-scale latency on prompts.",
+    in the menu bar (auto-rejected after ~60s → error 113), UNLESS your client holds an active grant \
+    (funding still always prompts). Expect human-scale latency on prompts.",
 
         "submit_model": "Transaction methods (addInvokeTransaction, addDeclareTransaction, \
-requestFunding, deployAccount) are SIGN-ONLY by default: they return a signed transaction you \
-broadcast yourself (broadcasting is keyless — the signature authorizes it). Pass submit:true to \
-have the wallet broadcast via its node (requires a node for the active network). With a node, \
-nonce + fee are auto-filled; without one, supply nonce + resource_bounds yourself.",
+    requestFunding, deployAccount) are SIGN-ONLY by default: they return a signed transaction you \
+    broadcast yourself (broadcasting is keyless — the signature authorizes it). Pass submit:true to \
+    have the wallet broadcast via its node (requires a node for the active network). With a node, \
+    nonce + fee are auto-filled; without one, supply nonce + resource_bounds yourself.",
 
         "quickstart": [
             "1. Pair once: POST {\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"companion_requestPairing\",\"params\":{\"name\":\"my-agent\",\"kind\":\"agent\"}} with header X-Companion-Client. The user approves; you receive {client_id, token}. (Pairing + grants persist across restarts.)",
@@ -141,9 +141,9 @@ nonce + fee are auto-filled; without one, supply nonce + resource_bounds yoursel
 
         "snip36_proving": {
             "what": "Prove a PRIVATE Starknet computation off-chain (SNIP-36) and verify only the \
-result on-chain — your private inputs never leave this machine. It is a TWO-transaction flow; \
-The companion automates the key-holding half (sign + prove), you broadcast the verifier tx. See \
-concepts.proving.",
+    result on-chain — your private inputs never leave this machine. It is a TWO-transaction flow; \
+    The companion automates the key-holding half (sign + prove), you broadcast the verifier tx. See \
+    concepts.proving.",
             "steps": [
                 "1. Build the VIRTUAL call (Tx A) — your contract's virtual function, e.g. create_proof(public_input, private_input). Choose resource_bounds MANUALLY (~2× current gas prices); do NOT estimate (that would leak your private calldata to the RPC node).",
                 "2. Sign + prove in one step: companion_signAndProve {account_address, calls, resource_bounds, nonce, block_number?, chainId?} → {job_id}. The companion signs Tx A and proves it on-device; the signed tx is never broadcast. (nonce must equal the account nonce at the reference block.)",
@@ -156,15 +156,15 @@ concepts.proving.",
 
         "strk20_privacy": {
             "what": "Private balances in the Starknet privacy pool (STRK20, wallet-API 0.10.4). \
-Funds in the pool are notes only your account's viewing key can read or spend; the companion derives that \
-key per call (same derivation as bramble, so the same seed sees the same notes) and never returns it.",
+    Funds in the pool are notes only your account's viewing key can read or spend; the companion derives that \
+    key per call (same derivation as bramble, so the same seed sees the same notes) and never returns it.",
             "how_it_runs": "register, transfer and withdraw are PROVED ON THIS MACHINE (~20-70 s). \
-A deposit must be screened, so it is proved by a remote screening prover (the user's own, else \
-Starkscan with the user's key, else the bramble gateway; mainnet only for the latter two) — that \
-prover sees the transaction, viewing key included. Register and deposits are public and submitted \
-from your account. Transfers and withdrawals are relayed privately by the AVNU paymaster if the \
-user set an AVNU key; otherwise use wallet_strk20PrepareInvoke and submit the result from ANY \
-other account. Each call is approval-gated and synchronous (expect up to ~1-2 min).",
+    A deposit must be screened, so it is proved by a remote screening prover (the user's own, else \
+    Starkscan with the user's key, else the bramble gateway; mainnet only for the latter two) — that \
+    prover sees the transaction, viewing key included. Register and deposits are public and submitted \
+    from your account. Transfers and withdrawals are relayed privately by the AVNU paymaster if the \
+    user set an AVNU key; otherwise use wallet_strk20PrepareInvoke and submit the result from ANY \
+    other account. Each call is approval-gated and synchronous (expect up to ~1-2 min).",
             "steps": [
                 "1. Register once: companion_strk20Register {account_address?} → {transaction_hash}. Opens your channel to yourself too.",
                 "2. Shield: wallet_strk20InvokeTransaction {actions:[{type:\"deposit\", token, amount}]} → {transaction_hash}. Deposits can't share a batch with private actions.",
@@ -174,54 +174,54 @@ other account. Each call is approval-gated and synchronous (expect up to ~1-2 mi
                 "Pool: the user picks it per network in Settings → STRK20 (default: the canonical pool); you can't. The STRK20 methods (and companion_strk20Plan) accept an optional pool_address that only asserts which pool you expect: a mismatch is 114, nothing runs. On a testnet pool the user deployed, deposits may be screened by a local test screener key instead of a remote prover."
             ],
             "owner_contracts": "A deployed contract that advertises SRC5 is_custom_signature_valid \
-(interface 0x2eb9faa4ce06e09879e93803798b87d22877b73964334356bf9e0d8cc22ded) can own private notes: the pool asks \
-the contract itself to approve each spend. Enrol it with companion_strk20AddOwner (always prompts, even under a \
-grant); the companion then holds its viewing key, derived from one of your accounts (the controller). The contract's code \
-sees that key and the channel keys of every batch while it is proved (the pool passes them to its check), so enrol \
-only contracts whose code you trust. List with \
-companion_strk20ListOwners, forget with companion_strk20RemoveOwner. Then PLAN a batch with \
-companion_strk20Plan {owner_address, register:true | actions:[…]}: the companion fixes the actions (signs and proves \
-nothing) and returns plan_hash, the SNIP-12 digest of typed_data (companion_typedDataHash reproduces it with \
-account_address = the owner). The owner contract approves plan_hash on-chain; then PROVE it with \
-companion_strk20Prove {plan_id, signature:[…]} → {job_id} and poll companion_proveStatus. The owner's approval \
-must be in state at or before the reference block B, which defaults to head − 12: wait about 12 blocks after the \
-approval lands, or pass block_number ≥ the approval's block. Plans also work for your own accounts \
-(account_address); the companion signs those at prove time. owner_address on the wallet_strk20* methods still returns \
--32601, and owner_address together with account_address is a 114.",
+    (interface 0x2eb9faa4ce06e09879e93803798b87d22877b73964334356bf9e0d8cc22ded) can own private notes: the pool asks \
+    the contract itself to approve each spend. Enrol it with companion_strk20AddOwner (always prompts, even under a \
+    grant); the companion then holds its viewing key, derived from one of your accounts (the controller). The contract's code \
+    sees that key and the channel keys of every batch while it is proved (the pool passes them to its check), so enrol \
+    only contracts whose code you trust. List with \
+    companion_strk20ListOwners, forget with companion_strk20RemoveOwner. Then PLAN a batch with \
+    companion_strk20Plan {owner_address, register:true | actions:[…]}: the companion fixes the actions (signs and proves \
+    nothing) and returns plan_hash, the SNIP-12 digest of typed_data (companion_typedDataHash reproduces it with \
+    account_address = the owner). The owner contract approves plan_hash on-chain; then PROVE it with \
+    companion_strk20Prove {plan_id, signature:[…]} → {job_id} and poll companion_proveStatus. The owner's approval \
+    must be in state at or before the reference block B, which defaults to head − 12: wait about 12 blocks after the \
+    approval lands, or pass block_number ≥ the approval's block. Plans also work for your own accounts \
+    (account_address); the companion signs those at prove time. owner_address on the wallet_strk20* methods still returns \
+    -32601, and owner_address together with account_address is a 114.",
             "plans": "A plan lives in memory only: bound to the client that made it, expires_at (Unix ms) after \
-ttl_secs (default 3600, max 86400), and wiped when the wallet locks or restarts. One live plan per owner and pool \
-for your client (another client's plans don't count, and their plans race yours on the same notes: the second to \
-land fails), 4 per client, 32 in all (else -32006 PLAN_LIMIT). By default you get plan_hash, typed_data and a summary (tokens, \
-amounts, recipients, action count, pool fee), not the actions. reveal_actions:true asks the user separately (a grant \
-never covers it) and returns client_actions + client_actions_felts: they hold channel keys, which disclose every \
-past and future payment on those channels, irrevocably (they cannot spend). If the user refuses, the plan still \
-comes back with actions_revealed:false. A register plan is never revealed: its SetViewingKey random would let anyone \
-recover the viewing key from the pool's auditor ciphertext, so reveal_actions:true on it shows no prompt and returns \
-the plan with actions_revealed:false and reveal_refused:\"REVEAL_UNSAFE_FOR_REGISTER\" (no actions). One new channel per batch: opening channels to two or more new recipients \
-in one transaction shows the pool that they share a sender (error 120). An owner contract that must pay several new \
-recipients atomically can pass allow_linkage:true; the user then sees the list of recipients it links, even under a \
-grant, and summary.linkage_allowed is true. Accounts can't (114 LINKAGE_OWNERS_ONLY).",
+    ttl_secs (default 3600, max 86400), and wiped when the wallet locks or restarts. One live plan per owner and pool \
+    for your client (another client's plans don't count, and their plans race yours on the same notes: the second to \
+    land fails), 4 per client, 32 in all (else -32006 PLAN_LIMIT). By default you get plan_hash, typed_data and a summary (tokens, \
+    amounts, recipients, action count, pool fee), not the actions. reveal_actions:true asks the user separately (a grant \
+    never covers it) and returns client_actions + client_actions_felts: they hold channel keys, which disclose every \
+    past and future payment on those channels, irrevocably (they cannot spend). If the user refuses, the plan still \
+    comes back with actions_revealed:false. A register plan is never revealed: its SetViewingKey random would let anyone \
+    recover the viewing key from the pool's auditor ciphertext, so reveal_actions:true on it shows no prompt and returns \
+    the plan with actions_revealed:false and reveal_refused:\"REVEAL_UNSAFE_FOR_REGISTER\" (no actions). One new channel per batch: opening channels to two or more new recipients \
+    in one transaction shows the pool that they share a sender (error 120). An owner contract that must pay several new \
+    recipients atomically can pass allow_linkage:true; the user then sees the list of recipients it links, even under a \
+    grant, and summary.linkage_allowed is true. Accounts can't (114 LINKAGE_OWNERS_ONLY).",
             "prove": "companion_strk20Prove runs every check before queueing (errors come back at once with \
-data.reason), consumes the plan, and queues a proving job only your client can poll. The companion never signs for an \
-owner: signature is the felts its is_custom_signature_valid reads, passed verbatim (required; [] if it only checks \
-the on-chain approval). submit:\"none\" (default) → result {call, proof}, submit it yourself like \
-wallet_strk20PrepareInvoke's; submit:\"account\" → the companion submits from submitter_address (default: the owner's \
-controller), which pays the gas and the pool fee and is publicly linked to the owner → result {transaction_hash, \
-submitter_address, call}. A rejected owner signature fails the job with error_reason OWNER_SIGNATURE_REJECTED; the \
-plan is spent either way, so make and approve a new one. Results are kept 1 h and dropped when the wallet locks; \
-nothing about the job is written to proof storage.",
+    data.reason), consumes the plan, and queues a proving job only your client can poll. The companion never signs for an \
+    owner: signature is the felts its is_custom_signature_valid reads, passed verbatim (required; [] if it only checks \
+    the on-chain approval). submit:\"none\" (default) → result {call, proof}, submit it yourself like \
+    wallet_strk20PrepareInvoke's; submit:\"account\" → the companion submits from submitter_address (default: the owner's \
+    controller), which pays the gas and the pool fee and is publicly linked to the owner → result {transaction_hash, \
+    submitter_address, call}. A rejected owner signature fails the job with error_reason OWNER_SIGNATURE_REJECTED; the \
+    plan is spent either way, so make and approve a new one. Results are kept 1 h and dropped when the wallet locks; \
+    nothing about the job is written to proof storage.",
             "note_disclosure": "To let a third party (an app, or a proof it consumes) verify a private payment \
-without anyone's viewing key: (1) wallet_strk20PrepareInvoke, wallet_strk20InvokeTransaction, companion_strk20Plan \
-and the companion_strk20Prove job result return notes: [{recipient, token, amount, index, note_id, salt}], one per \
-TRANSFER note the batch creates (change and deposit notes back to you are not listed; an explicit transfer to \
-yourself is). index is the note's position on the (you → recipient, token) subchannel; note_id = \
-H('NOTE_ID_TAG:V1', channel_key, token, index, 0) is what the pool's get_note takes; salt is public once the note \
-lands. No key is in a locator. (2) companion_strk20ChannelKey {recipient} returns the channel key and marker the \
-verifier needs: channel_exists(marker) proves you opened the channel, get_note(note_id) plus the amount pad \
-(low 128 bits of H('ENC_AMOUNT_TAG:V1', channel_key, token, index, 0, salt)) gives the amount. WARNING: the \
-channel key reveals EVERY past and future payment from you to that recipient, in every token, and cannot be \
-revoked; it does not allow spending. It always prompts, even under a grant. Ask for it only when the user wants \
-that disclosure."
+    without anyone's viewing key: (1) wallet_strk20PrepareInvoke, wallet_strk20InvokeTransaction, companion_strk20Plan \
+    and the companion_strk20Prove job result return notes: [{recipient, token, amount, index, note_id, salt}], one per \
+    TRANSFER note the batch creates (change and deposit notes back to you are not listed; an explicit transfer to \
+    yourself is). index is the note's position on the (you → recipient, token) subchannel; note_id = \
+    H('NOTE_ID_TAG:V1', channel_key, token, index, 0) is what the pool's get_note takes; salt is public once the note \
+    lands. No key is in a locator. (2) companion_strk20ChannelKey {recipient} returns the channel key and marker the \
+    verifier needs: channel_exists(marker) proves you opened the channel, get_note(note_id) plus the amount pad \
+    (low 128 bits of H('ENC_AMOUNT_TAG:V1', channel_key, token, index, 0, salt)) gives the amount. WARNING: the \
+    channel key reveals EVERY past and future payment from you to that recipient, in every token, and cannot be \
+    revoked; it does not allow spending. It always prompts, even under a grant. Ask for it only when the user wants \
+    that disclosure."
         },
 
         "methods": [
@@ -299,18 +299,18 @@ that disclosure."
             { "method": "wallet_addInvokeTransaction", "auth": true, "prompts": true,
               "params": "{ account_address, calls, submit?, nonce?, resource_bounds?, proof_facts?, proof?, chainId? }",
               "call_shape": "calls = [{ contract_address, entry_point_selector, calldata: [felt…] }]. \
-entry_point_selector may be a FUNCTION NAME (e.g. \"transfer\") or a 0x selector. Aliases accepted: \
-contractAddress/to for the address; entrypoint/entry_point/selector for the selector.",
+    entry_point_selector may be a FUNCTION NAME (e.g. \"transfer\") or a 0x selector. Aliases accepted: \
+    contractAddress/to for the address; entrypoint/entry_point/selector for the selector.",
               "returns": "{ transaction_hash, submitted }. When sign-only: also `signature` and `signed_transaction` — a COMPLETE, canonical-hex INVOKE_TXN_V3 (all fields incl. signature, tip, paymaster_data, account_deployment_data, both DA modes, and proof/proof_facts when proof-carrying) that you can submit to starknet_addInvokeTransaction as-is.",
               "note": "See submit_model for sign-only vs broadcast and nonce/fee rules. No need to hand-assemble the tx — signed_transaction is broadcast-ready. Sign-only forces you to supply resource_bounds unless you call companion_estimateFee first.",
               "snip36": "Proof-carrying invoke: pass proof_facts (felt[]) and the signed V3 hash is \
-extended with Poseidon(proof_facts) so the signature covers them (required at sign time). On \
-submit:true also pass proof (standard-base64 STWO string; surrounding whitespace is stripped and \
-url-safe '-'/'_' is rejected) — required to broadcast. With submit:true and the proof, the companion \
-estimates the fee WITH the proof attached (its on-chain verification dominates the fee), so \
-resource_bounds may be omitted. Sign-only without the proof needs explicit resource_bounds \
-(~2× current gas prices); companion_estimateFee does not include the proof and undercharges. Sign-only echoes proof_facts/proof so you can assemble the broadcast yourself. Omit both for a \
-normal invoke." },
+    extended with Poseidon(proof_facts) so the signature covers them (required at sign time). On \
+    submit:true also pass proof (standard-base64 STWO string; surrounding whitespace is stripped and \
+    url-safe '-'/'_' is rejected) — required to broadcast. With submit:true and the proof, the companion \
+    estimates the fee WITH the proof attached (its on-chain verification dominates the fee), so \
+    resource_bounds may be omitted. Sign-only without the proof needs explicit resource_bounds \
+    (~2× current gas prices); companion_estimateFee does not include the proof and undercharges. Sign-only echoes proof_facts/proof so you can assemble the broadcast yourself. Omit both for a \
+    normal invoke." },
             { "method": "wallet_addDeclareTransaction", "auth": true, "prompts": true,
               "params": "{ account_address, compiled_class_hash, contract_class?, class_hash?, submit?, nonce?, resource_bounds?, chainId? }",
               "returns": "{ transaction_hash, class_hash, submitted } (+ signature/signed_transaction when not submitted)",
@@ -363,8 +363,8 @@ normal invoke." },
 
         "deferred": {
             "note": "In the Starknet wallet spec but not built yet; returns -32601. \
-wallet_addStarknetChain needs a chain id beyond Sepolia/Mainnet; the STRK20 shadow-account \
-commitment comes with shadow-account invokes.",
+    wallet_addStarknetChain needs a chain id beyond Sepolia/Mainnet; the STRK20 shadow-account \
+    commitment comes with shadow-account invokes.",
             "methods": ["wallet_addStarknetChain", "wallet_strk20ShadowAccountCommitment"]
         },
 

@@ -185,7 +185,9 @@ mod tests {
     fn openzeppelin_constructor_commits_to_the_public_key() {
         let pk = Felt::from(0x123u32);
         assert_eq!(
-            AccountContract::OpenZeppelin.constructor_calldata(&pk).unwrap(),
+            AccountContract::OpenZeppelin
+                .constructor_calldata(&pk)
+                .unwrap(),
             vec![pk],
             "the key must be in the calldata — it is what binds the address to the owner"
         );

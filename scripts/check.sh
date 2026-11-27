@@ -8,8 +8,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-# `cargo fmt --check` is left out: the workspace is not rustfmt-clean yet, and reformatting it
-# belongs in its own change.
+cargo fmt --all --check
 cargo build --locked --all-targets
 cargo clippy --locked --all-targets -- -D warnings
 

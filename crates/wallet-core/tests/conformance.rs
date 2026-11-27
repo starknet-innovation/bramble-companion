@@ -52,14 +52,25 @@ fn every_vector_reproduces() {
     let d = doc();
     let mnemonic = d["mnemonic"].as_str().unwrap();
     let vectors = d["vectors"].as_array().unwrap();
-    assert!(!vectors.is_empty(), "the fixture must actually contain vectors");
+    assert!(
+        !vectors.is_empty(),
+        "the fixture must actually contain vectors"
+    );
 
     for v in vectors {
         let domain = domain_of(v["domain"].as_str().unwrap());
         let n = v["n"].as_u64().unwrap() as u32;
-        let where_ = format!("{} account {n} ({})", v["domain"].as_str().unwrap(), v["path"]);
+        let where_ = format!(
+            "{} account {n} ({})",
+            v["domain"].as_str().unwrap(),
+            v["path"]
+        );
 
-        assert_eq!(domain.path(n), v["path"].as_str().unwrap(), "path drifted for {where_}");
+        assert_eq!(
+            domain.path(n),
+            v["path"].as_str().unwrap(),
+            "path drifted for {where_}"
+        );
 
         let pk = public_key(mnemonic, domain, n, None).unwrap();
         assert_eq!(
@@ -68,9 +79,15 @@ fn every_vector_reproduces() {
             "public key drifted for {where_} — derivation itself changed",
         );
 
-        let addr =
-            account_address(mnemonic, domain, n, None, ChainId::Sepolia, AccountContract::OpenZeppelin)
-                .unwrap();
+        let addr = account_address(
+            mnemonic,
+            domain,
+            n,
+            None,
+            ChainId::Sepolia,
+            AccountContract::OpenZeppelin,
+        )
+        .unwrap();
         assert_eq!(
             address_hex(&addr),
             v["address"].as_str().unwrap(),
@@ -84,11 +101,21 @@ fn the_fixture_pins_the_conventions_the_addresses_depend_on() {
     let d = doc();
     // If any of these move, every address moves with them — they are the
     // reason the vectors are what they are.
-    assert_eq!(d["coin_type"].as_u64().unwrap() as u32, wallet_core::STARKNET_COIN_TYPE);
+    assert_eq!(
+        d["coin_type"].as_u64().unwrap() as u32,
+        wallet_core::STARKNET_COIN_TYPE
+    );
     // Compared against what Bramble Companion actually deploys with, not a literal.
     let mnemonic = d["mnemonic"].as_str().unwrap();
-    let deployed = deployment_data(mnemonic, Domain::User, 0, None, ChainId::Sepolia, AccountContract::OpenZeppelin)
-            .unwrap();
+    let deployed = deployment_data(
+        mnemonic,
+        Domain::User,
+        0,
+        None,
+        ChainId::Sepolia,
+        AccountContract::OpenZeppelin,
+    )
+    .unwrap();
     assert_eq!(
         Felt::from_hex(d["salt"].as_str().unwrap()).unwrap(),
         deployed.salt,
@@ -97,7 +124,11 @@ fn the_fixture_pins_the_conventions_the_addresses_depend_on() {
     assert_eq!(d["account_contract"].as_str().unwrap(), "openzeppelin");
     assert_eq!(
         d["class_hash"].as_str().unwrap(),
-        address_hex(&AccountContract::OpenZeppelin.class_hash(ChainId::Sepolia).unwrap()),
+        address_hex(
+            &AccountContract::OpenZeppelin
+                .class_hash(ChainId::Sepolia)
+                .unwrap()
+        ),
         "the OZ class hash moved — krusty's manifest changed under us",
     );
 }
@@ -122,7 +153,10 @@ fn the_two_branches_never_produce_the_same_address() {
     let mut seen = std::collections::HashSet::new();
     for v in vectors {
         let addr = v["address"].as_str().unwrap();
-        assert!(seen.insert(addr), "duplicate address across vectors: {addr}");
+        assert!(
+            seen.insert(addr),
+            "duplicate address across vectors: {addr}"
+        );
         assert_ne!(Felt::from_hex(addr).unwrap(), Felt::ZERO);
     }
 }
@@ -153,11 +187,18 @@ fn felt(v: &Value) -> Felt {
 fn every_typed_data_digest_reproduces() {
     let d = doc();
     let vectors = d["typed_data_vectors"].as_array().unwrap();
-    assert!(vectors.len() >= 2, "need the minimal and the multi-type message");
+    assert!(
+        vectors.len() >= 2,
+        "need the minimal and the multi-type message"
+    );
     for (i, v) in vectors.iter().enumerate() {
         let h = typed_data_message_hash(&v["typed_data"].to_string(), &felt(&v["account_address"]))
             .unwrap();
-        assert_eq!(address_hex(&h), v["message_hash"].as_str().unwrap(), "SNIP-12 digest #{i} drifted");
+        assert_eq!(
+            address_hex(&h),
+            v["message_hash"].as_str().unwrap(),
+            "SNIP-12 digest #{i} drifted"
+        );
     }
 }
 
@@ -169,9 +210,16 @@ fn every_invoke_v3_hash_reproduces() {
     let vectors = d["invoke_v3_vectors"].as_array().unwrap();
     assert!(!vectors.is_empty());
     let rb = |r: &Value| ResourceBounds {
-        max_amount: u64::from_str_radix(r["max_amount"].as_str().unwrap().trim_start_matches("0x"), 16).unwrap(),
+        max_amount: u64::from_str_radix(
+            r["max_amount"].as_str().unwrap().trim_start_matches("0x"),
+            16,
+        )
+        .unwrap(),
         max_price_per_unit: u128::from_str_radix(
-            r["max_price_per_unit"].as_str().unwrap().trim_start_matches("0x"),
+            r["max_price_per_unit"]
+                .as_str()
+                .unwrap()
+                .trim_start_matches("0x"),
             16,
         )
         .unwrap(),
@@ -185,17 +233,26 @@ fn every_invoke_v3_hash_reproduces() {
         // The vector stores encoded calldata; decode the single call back out.
         let cd: Vec<Felt> = v["calldata"].as_array().unwrap().iter().map(felt).collect();
         assert_eq!(cd[0], Felt::ONE, "vectors hold exactly one call");
-        let calls = vec![Call { to: cd[1], selector: cd[2], calldata: cd[4..].to_vec() }];
+        let calls = vec![Call {
+            to: cd[1],
+            selector: cd[2],
+            calldata: cd[4..].to_vec(),
+        }];
         let r = &v["resource_bounds"];
         let params = InvokeV3Params {
             nonce: felt(&v["nonce"]),
-            tip: u64::from_str_radix(v["tip"].as_str().unwrap().trim_start_matches("0x"), 16).unwrap(),
+            tip: u64::from_str_radix(v["tip"].as_str().unwrap().trim_start_matches("0x"), 16)
+                .unwrap(),
             l1_gas: rb(&r["l1_gas"]),
             l2_gas: rb(&r["l2_gas"]),
             l1_data_gas: rb(&r["l1_data_gas"]),
             ..Default::default()
         };
         let h = invoke_v3_hash(&felt(&v["sender_address"]), &calls, chain, &params);
-        assert_eq!(address_hex(&h), v["transaction_hash"].as_str().unwrap(), "invoke hash drifted on {chain:?}");
+        assert_eq!(
+            address_hex(&h),
+            v["transaction_hash"].as_str().unwrap(),
+            "invoke hash drifted on {chain:?}"
+        );
     }
 }

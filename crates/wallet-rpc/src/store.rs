@@ -38,8 +38,9 @@ impl VaultStore {
             Ok(bytes) => {
                 let s = String::from_utf8(bytes)
                     .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "vault not utf-8"))?;
-                let vault = EncryptedVault::from_json(&s)
-                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "vault parse failed"))?;
+                let vault = EncryptedVault::from_json(&s).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "vault parse failed")
+                })?;
                 Ok(Some(vault))
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),

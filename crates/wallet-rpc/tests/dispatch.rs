@@ -45,9 +45,18 @@ impl StarknetRpc for MockNode {
         _nonce: &Felt,
     ) -> Result<FeeBounds, NodeError> {
         Ok(FeeBounds {
-            l1_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 7 },
-            l2_gas: ResourceBounds { max_amount: 200_000, max_price_per_unit: 11 },
-            l1_data_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 3 },
+            l1_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 7,
+            },
+            l2_gas: ResourceBounds {
+                max_amount: 200_000,
+                max_price_per_unit: 11,
+            },
+            l1_data_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 3,
+            },
         })
     }
     async fn add_invoke(
@@ -79,9 +88,18 @@ impl StarknetRpc for MockNode {
         _salt: &Felt,
     ) -> Result<FeeBounds, NodeError> {
         Ok(FeeBounds {
-            l1_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 7 },
-            l2_gas: ResourceBounds { max_amount: 200_000, max_price_per_unit: 11 },
-            l1_data_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 3 },
+            l1_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 7,
+            },
+            l2_gas: ResourceBounds {
+                max_amount: 200_000,
+                max_price_per_unit: 11,
+            },
+            l1_data_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 3,
+            },
         })
     }
     async fn add_deploy_account(
@@ -102,9 +120,18 @@ impl StarknetRpc for MockNode {
         _nonce: &Felt,
     ) -> Result<FeeBounds, NodeError> {
         Ok(FeeBounds {
-            l1_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 7 },
-            l2_gas: ResourceBounds { max_amount: 200_000, max_price_per_unit: 11 },
-            l1_data_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 3 },
+            l1_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 7,
+            },
+            l2_gas: ResourceBounds {
+                max_amount: 200_000,
+                max_price_per_unit: 11,
+            },
+            l1_data_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 3,
+            },
         })
     }
     async fn add_declare(
@@ -349,7 +376,13 @@ async fn agent_creates_and_sees_only_its_own_accounts() {
 async fn app_client_cannot_create_agent_accounts() {
     let state = state_with(Decision::Approve, false);
     let app = pair(&state, "app").await;
-    let resp = call(&state, Some(&app), "companion_createAgentAccount", json!({})).await;
+    let resp = call(
+        &state,
+        Some(&app),
+        "companion_createAgentAccount",
+        json!({}),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32002); // Forbidden
 }
 
@@ -485,13 +518,7 @@ async fn agent_cannot_sign_with_a_user_account() {
 async fn deferred_methods_report_not_implemented() {
     let state = state_with(Decision::Approve, false);
     let token = pair(&state, "app").await;
-    let resp = call(
-        &state,
-        Some(&token),
-        "wallet_addStarknetChain",
-        json!({}),
-    )
-    .await;
+    let resp = call(&state, Some(&token), "wallet_addStarknetChain", json!({})).await;
     assert_eq!(err_code(&resp), -32601);
     assert!(resp.error.unwrap().message.contains("later phase"));
 }
@@ -502,16 +529,32 @@ async fn deferred_methods_report_not_implemented() {
 async fn strk20_methods_validate_params_first() {
     let state = state_with(Decision::Approve, false);
     let token = pair(&state, "app").await;
-    for method in ["wallet_strk20PrepareInvoke", "wallet_strk20InvokeTransaction", "wallet_strk20Balances"] {
+    for method in [
+        "wallet_strk20PrepareInvoke",
+        "wallet_strk20InvokeTransaction",
+        "wallet_strk20Balances",
+    ] {
         let resp = call(&state, Some(&token), method, json!({})).await;
         assert_eq!(err_code(&resp), 114, "{method}");
     }
     let open = json!({ "actions": [{ "type": "transfer", "token": "0x4718", "amount": "OPEN", "recipient": "0x1" }] });
-    assert_eq!(err_code(&call(&state, Some(&token), "wallet_strk20PrepareInvoke", open).await), -32601);
+    assert_eq!(
+        err_code(&call(&state, Some(&token), "wallet_strk20PrepareInvoke", open).await),
+        -32601
+    );
     // Valid params, but no node to read the pool from.
     let ok = json!({ "tokens": ["0x4718"] });
-    assert_eq!(err_code(&call(&state, Some(&token), "wallet_strk20Balances", ok).await), -32005);
-    let resp = call(&state, Some(&token), "wallet_strk20ShadowAccountCommitment", json!({ "dapp_name": "x" })).await;
+    assert_eq!(
+        err_code(&call(&state, Some(&token), "wallet_strk20Balances", ok).await),
+        -32005
+    );
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_strk20ShadowAccountCommitment",
+        json!({ "dapp_name": "x" }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32601);
     assert!(resp.error.unwrap().message.contains("later phase"));
 }
@@ -531,7 +574,13 @@ async fn strk20_balances_need_approval() {
     };
     state.set_node(ChainId::Sepolia, Some(Arc::new(node)));
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "wallet_strk20Balances", json!({ "tokens": ["0x4718"] })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_strk20Balances",
+        json!({ "tokens": ["0x4718"] }),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113);
 }
 
@@ -600,7 +649,10 @@ async fn add_invoke_sign_only_returns_signed_payload() {
     assert_eq!(r["signature"].as_array().unwrap().len(), 2);
     // Encoded calldata: [n_calls, to, selector, calldata_len, ...3] = 7 felts.
     assert_eq!(
-        r["signed_transaction"]["calldata"].as_array().unwrap().len(),
+        r["signed_transaction"]["calldata"]
+            .as_array()
+            .unwrap()
+            .len(),
         7
     );
     assert_eq!(r["signed_transaction"]["version"], json!("0x3"));
@@ -625,9 +677,17 @@ async fn add_invoke_accepts_entrypoint_name_alias() {
         }
     });
     let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p).await;
-    let r = resp.result.expect("entrypoint-name alias should be accepted");
+    let r = resp
+        .result
+        .expect("entrypoint-name alias should be accepted");
     assert_eq!(r["submitted"], json!(false));
-    assert_eq!(r["signed_transaction"]["calldata"].as_array().unwrap().len(), 7);
+    assert_eq!(
+        r["signed_transaction"]["calldata"]
+            .as_array()
+            .unwrap()
+            .len(),
+        7
+    );
 }
 
 #[tokio::test]
@@ -657,9 +717,21 @@ async fn deploy_account_submit_with_node_broadcasts() {
     let state = state_with_node(Decision::Approve, "0x0", "0xdeed");
     let agent = pair(&state, "agent").await;
     // Agent creates an account, then deploys it (auto fee estimate + broadcast).
-    let created = call(&state, Some(&agent), "companion_createAgentAccount", json!({"label": "bot"})).await;
+    let created = call(
+        &state,
+        Some(&agent),
+        "companion_createAgentAccount",
+        json!({"label": "bot"}),
+    )
+    .await;
     let _ = created.result.unwrap();
-    let resp = call(&state, Some(&agent), "companion_deployAccount", json!({ "submit": true })).await;
+    let resp = call(
+        &state,
+        Some(&agent),
+        "companion_deployAccount",
+        json!({ "submit": true }),
+    )
+    .await;
     let r = resp.result.expect("broadcast deploy");
     assert_eq!(r["submitted"], json!(true));
     assert_eq!(r["transaction_hash"], json!("0xdeed"));
@@ -718,7 +790,10 @@ async fn add_declare_sign_only_returns_a_broadcastable_transaction() {
     assert_eq!(tx["account_deployment_data"], json!([]));
     assert_eq!(tx["nonce_data_availability_mode"], json!("L1"));
     assert_eq!(tx["fee_data_availability_mode"], json!("L1"));
-    assert_eq!(tx["resource_bounds"]["l2_gas"]["max_amount"], json!("0xf4240"));
+    assert_eq!(
+        tx["resource_bounds"]["l2_gas"]["max_amount"],
+        json!("0xf4240")
+    );
     // No class was supplied, so none is echoed (the caller splices theirs in).
     assert!(tx.get("contract_class").is_none());
 }
@@ -747,7 +822,9 @@ async fn add_declare_signs_the_hash_the_account_will_validate() {
     assert_eq!(r["class_hash"], json!(COUNTER_CLASS_HASH));
     let tx = &r["signed_transaction"];
     assert!(tx["contract_class"]["abi"].is_string());
-    assert!(tx["contract_class"].get("sierra_program_debug_info").is_none());
+    assert!(tx["contract_class"]
+        .get("sierra_program_debug_info")
+        .is_none());
 
     // The reported tx hash is the canonical DECLARE_V3 hash over that class
     // hash, and the account's own key validates the signature over it — the
@@ -760,9 +837,18 @@ async fn add_declare_signs_the_hash_the_account_will_validate() {
         ChainId::Sepolia,
         &InvokeV3Params {
             nonce: Felt::from(7u64),
-            l1_gas: ResourceBounds { max_amount: 0x3e8, max_price_per_unit: 0x1 },
-            l2_gas: ResourceBounds { max_amount: 0xf4240, max_price_per_unit: 0x2 },
-            l1_data_gas: ResourceBounds { max_amount: 0x3e8, max_price_per_unit: 0x3 },
+            l1_gas: ResourceBounds {
+                max_amount: 0x3e8,
+                max_price_per_unit: 0x1,
+            },
+            l2_gas: ResourceBounds {
+                max_amount: 0xf4240,
+                max_price_per_unit: 0x2,
+            },
+            l1_data_gas: ResourceBounds {
+                max_amount: 0x3e8,
+                max_price_per_unit: 0x3,
+            },
             ..Default::default()
         },
     );
@@ -835,7 +921,10 @@ async fn add_declare_agreeing_class_hash_is_accepted() {
         }),
     )
     .await;
-    assert_eq!(resp.result.expect("signed declare")["class_hash"], json!(COUNTER_CLASS_HASH));
+    assert_eq!(
+        resp.result.expect("signed declare")["class_hash"],
+        json!(COUNTER_CLASS_HASH)
+    );
 }
 
 #[tokio::test]
@@ -893,7 +982,10 @@ async fn add_declare_malformed_contract_class_is_114_with_a_reason() {
     .await;
     assert_eq!(err_code(&resp), 114);
     let msg = resp.error.unwrap().message;
-    assert!(msg.contains("contract_class") && msg.contains("compressed"), "{msg}");
+    assert!(
+        msg.contains("contract_class") && msg.contains("compressed"),
+        "{msg}"
+    );
 }
 
 #[tokio::test]
@@ -911,8 +1003,17 @@ async fn add_invoke_with_proof_facts_changes_hash_and_echoes() {
     let (_, address) = user_registry();
     let token = pair(&state, "app").await;
 
-    let plain = call(&state, Some(&token), "wallet_addInvokeTransaction", invoke_params(&address)).await;
-    let plain_hash = plain.result.unwrap()["transaction_hash"].as_str().unwrap().to_string();
+    let plain = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        invoke_params(&address),
+    )
+    .await;
+    let plain_hash = plain.result.unwrap()["transaction_hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Same tx + proof_facts → different (SNIP-36 extended) hash, and the facts
     // are echoed back for the caller to assemble a broadcast.
@@ -920,9 +1021,16 @@ async fn add_invoke_with_proof_facts_changes_hash_and_echoes() {
     p["proof_facts"] = json!(["0x1", "0x2", "0x3"]);
     let proofed = call(&state, Some(&token), "wallet_addInvokeTransaction", p).await;
     let r = proofed.result.expect("signed proof-carrying invoke");
-    assert_ne!(r["transaction_hash"].as_str().unwrap(), plain_hash, "proof_facts must extend the hash");
+    assert_ne!(
+        r["transaction_hash"].as_str().unwrap(),
+        plain_hash,
+        "proof_facts must extend the hash"
+    );
     // proof_facts live inside the complete signed_transaction.
-    assert_eq!(r["signed_transaction"]["proof_facts"], json!(["0x1", "0x2", "0x3"]));
+    assert_eq!(
+        r["signed_transaction"]["proof_facts"],
+        json!(["0x1", "0x2", "0x3"])
+    );
     assert_eq!(r["submitted"], json!(false));
 }
 
@@ -935,7 +1043,13 @@ async fn add_invoke_submit_proof_carrying_requires_proof() {
     p["submit"] = json!(true);
     p["proof_facts"] = json!(["0x1"]);
     // No `proof` → 114.
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p.clone()).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        p.clone(),
+    )
+    .await;
     assert_eq!(err_code(&resp), 114);
 
     // With `proof` → broadcasts (mock node returns its hash).
@@ -1007,21 +1121,39 @@ async fn add_invoke_per_request_chain_id_changes_hash() {
     let token = pair(&state, "app").await;
 
     // Default network (Sepolia).
-    let base = call(&state, Some(&token), "wallet_addInvokeTransaction", invoke_params(&address)).await;
-    let base_hash = base.result.unwrap()["transaction_hash"].as_str().unwrap().to_string();
+    let base = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        invoke_params(&address),
+    )
+    .await;
+    let base_hash = base.result.unwrap()["transaction_hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Explicit chainId = SN_MAIN → different signed hash.
     let mut mainnet = invoke_params(&address);
     mainnet["chainId"] = json!("0x534e5f4d41494e");
     let r = call(&state, Some(&token), "wallet_addInvokeTransaction", mainnet).await;
-    let mainnet_hash = r.result.expect("signed on mainnet")["transaction_hash"].as_str().unwrap().to_string();
-    assert_ne!(mainnet_hash, base_hash, "per-request chainId must flow into the signed hash");
+    let mainnet_hash = r.result.expect("signed on mainnet")["transaction_hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(
+        mainnet_hash, base_hash,
+        "per-request chainId must flow into the signed hash"
+    );
 
     // Explicit chainId = the default (SN_SEPOLIA) → same hash as omitting it.
     let mut sep = invoke_params(&address);
     sep["chainId"] = json!("0x534e5f5345504f4c4941");
     let r2 = call(&state, Some(&token), "wallet_addInvokeTransaction", sep).await;
-    assert_eq!(r2.result.unwrap()["transaction_hash"].as_str().unwrap(), base_hash);
+    assert_eq!(
+        r2.result.unwrap()["transaction_hash"].as_str().unwrap(),
+        base_hash
+    );
 }
 
 #[tokio::test]
@@ -1105,7 +1237,10 @@ async fn add_invoke_auto_nonce_and_fee_when_omitted() {
     // signed_transaction is a complete, canonical-hex INVOKE_TXN_V3: estimated
     // bounds (l2 max_amount 200000 = 0x30d40) appear as hex, plus all v3 fields.
     let tx = &r["signed_transaction"];
-    assert_eq!(tx["resource_bounds"]["l2_gas"]["max_amount"], json!("0x30d40"));
+    assert_eq!(
+        tx["resource_bounds"]["l2_gas"]["max_amount"],
+        json!("0x30d40")
+    );
     assert_eq!(tx["nonce_data_availability_mode"], json!("L1"));
     assert!(tx["signature"].as_array().unwrap().len() == 2);
     assert_eq!(tx["tip"], json!("0x0"));
@@ -1123,8 +1258,11 @@ fn state_with_balance(balance: u128, refuse_add: Option<&str>) -> Arc<ServerStat
         refuse_add: refuse_add.map(str::to_string),
     };
     Arc::new(
-        ServerState::new(Arc::new(Mutex::new(make_session(false))), Arc::new(AutoApprover(Decision::Approve)))
-            .with_node(ChainId::Sepolia, Arc::new(node)),
+        ServerState::new(
+            Arc::new(Mutex::new(make_session(false))),
+            Arc::new(AutoApprover(Decision::Approve)),
+        )
+        .with_node(ChainId::Sepolia, Arc::new(node)),
     )
 }
 
@@ -1138,10 +1276,14 @@ fn auto_fee_invoke(address: &str) -> Value {
 
 /// `Σ max_amount × max_price_per_unit` of a signed transaction's bounds.
 fn tx_max_fee(tx: &Value) -> u128 {
-    let n = |v: &Value| u128::from_str_radix(v.as_str().unwrap().trim_start_matches("0x"), 16).unwrap();
+    let n =
+        |v: &Value| u128::from_str_radix(v.as_str().unwrap().trim_start_matches("0x"), 16).unwrap();
     ["l1_gas", "l2_gas", "l1_data_gas"]
         .iter()
-        .map(|k| n(&tx["resource_bounds"][k]["max_amount"]) * n(&tx["resource_bounds"][k]["max_price_per_unit"]))
+        .map(|k| {
+            n(&tx["resource_bounds"][k]["max_amount"])
+                * n(&tx["resource_bounds"][k]["max_price_per_unit"])
+        })
         .sum()
 }
 
@@ -1155,19 +1297,37 @@ async fn auto_bounds_are_tightened_to_fit_the_balance() {
     let (_, address) = user_registry();
     let state = state_with_balance(2_150_000, None);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        auto_fee_invoke(&address),
+    )
+    .await;
     let r = resp.result.expect("tightened bounds fit the balance");
     let fee = tx_max_fee(&r["signed_transaction"]);
     // The mock's unit prices are tiny, so the price can only step down to its floor.
     assert!((2_000_000..=2_150_000).contains(&fee), "max fee {fee}");
     // The amounts keep their margin; the price headroom gave way.
-    assert_eq!(r["signed_transaction"]["resource_bounds"]["l2_gas"]["max_amount"], json!("0x30d40"));
+    assert_eq!(
+        r["signed_transaction"]["resource_bounds"]["l2_gas"]["max_amount"],
+        json!("0x30d40")
+    );
 
     // With enough balance, the node's bounds are used as they are.
     let state = state_with_balance(MOCK_MAX_FEE, None);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
-    assert_eq!(tx_max_fee(&resp.result.unwrap()["signed_transaction"]), MOCK_MAX_FEE);
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        auto_fee_invoke(&address),
+    )
+    .await;
+    assert_eq!(
+        tx_max_fee(&resp.result.unwrap()["signed_transaction"]),
+        MOCK_MAX_FEE
+    );
 }
 
 /// #61: a balance below even the tightest bounds is refused before signing,
@@ -1178,15 +1338,30 @@ async fn a_balance_below_the_tightest_bounds_is_refused_with_a_reason() {
     let (_, address) = user_registry();
     let state = state_with_balance(1_000, None);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", auto_fee_invoke(&address)).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        auto_fee_invoke(&address),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006);
-    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    assert_eq!(
+        reason(&resp).as_deref(),
+        Some("INSUFFICIENT_BALANCE_FOR_BOUNDS")
+    );
     let m = resp.error.unwrap().message;
     for want in ["estimated fee", "padded max fee", "balance 0.000000 STRK"] {
         assert!(m.contains(want), "message lacks the expected amounts");
     }
     // Caller-supplied bounds skip the balance fit.
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", invoke_params(&address)).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        invoke_params(&address),
+    )
+    .await;
     assert!(resp.result.is_some(), "explicit bounds are used as given");
 }
 
@@ -1200,12 +1375,28 @@ async fn the_nodes_exceed_balance_refusal_is_named() {
     let token = pair(&state, "app").await;
     let mut p = auto_fee_invoke(&address);
     p["submit"] = json!(true);
-    let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p.clone()).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        p.clone(),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006);
-    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
-    assert!(resp.error.unwrap().message.contains("balance 1.922662 STRK"));
+    assert_eq!(
+        reason(&resp).as_deref(),
+        Some("INSUFFICIENT_BALANCE_FOR_BOUNDS")
+    );
+    assert!(resp
+        .error
+        .unwrap()
+        .message
+        .contains("balance 1.922662 STRK"));
     // Any other broadcast failure stays a plain node error.
-    let state = state_with_balance(u128::MAX, Some(r#"{"code":55,"message":"Account validation failed"}"#));
+    let state = state_with_balance(
+        u128::MAX,
+        Some(r#"{"code":55,"message":"Account validation failed"}"#),
+    );
     let token = pair(&state, "app").await;
     let resp = call(&state, Some(&token), "wallet_addInvokeTransaction", p).await;
     assert_eq!(err_code(&resp), -32004);
@@ -1218,18 +1409,39 @@ async fn the_nodes_exceed_balance_refusal_is_named() {
 async fn deploy_account_bounds_fit_the_balance() {
     let state = state_with_balance(1_000, None);
     let agent = pair(&state, "agent").await;
-    let created = call(&state, Some(&agent), "companion_createAgentAccount", json!({"label": "bot"})).await;
+    let created = call(
+        &state,
+        Some(&agent),
+        "companion_createAgentAccount",
+        json!({"label": "bot"}),
+    )
+    .await;
     assert!(created.result.is_some());
-    let resp = call(&state, Some(&agent), "companion_deployAccount", json!({ "submit": true })).await;
+    let resp = call(
+        &state,
+        Some(&agent),
+        "companion_deployAccount",
+        json!({ "submit": true }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006);
-    assert_eq!(reason(&resp).as_deref(), Some("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    assert_eq!(
+        reason(&resp).as_deref(),
+        Some("INSUFFICIENT_BALANCE_FOR_BOUNDS")
+    );
 }
 
 #[tokio::test]
 async fn request_grant_approved_then_status_shows_active() {
     let state = state_with(Decision::Approve, false);
     let token = pair(&state, "agent").await;
-    let resp = call(&state, Some(&token), "companion_requestGrant", json!({"days": 30})).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestGrant",
+        json!({"days": 30}),
+    )
+    .await;
     let r = resp.result.expect("grant request approved");
     assert_eq!(r["granted"], json!(true));
     assert!(r["expires_at"].as_u64().unwrap() > wallet_rpc::now_unix_ms());
@@ -1245,12 +1457,29 @@ async fn request_grant_always_prompts_even_under_active_grant() {
     // (escalation always prompts).
     let state = state_rejecting(&["companion_requestGrant"]);
     let token = pair(&state, "agent").await;
-    let id = state.clients.lock().await.list().into_iter()
-        .find(|c| c.label == "agent-client").map(|c| c.id).unwrap();
+    let id = state
+        .clients
+        .lock()
+        .await
+        .list()
+        .into_iter()
+        .find(|c| c.label == "agent-client")
+        .map(|c| c.id)
+        .unwrap();
     grant_forever(&state, &id).await; // already granted
 
-    let resp = call(&state, Some(&token), "companion_requestGrant", json!({"days": 90})).await;
-    assert_eq!(err_code(&resp), 113, "requesting a grant must always prompt");
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestGrant",
+        json!({"days": 90}),
+    )
+    .await;
+    assert_eq!(
+        err_code(&resp),
+        113,
+        "requesting a grant must always prompt"
+    );
 }
 
 #[tokio::test]
@@ -1260,7 +1489,10 @@ async fn dispatch_records_activity_for_autolock() {
     tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     // Any RPC request counts as activity (resets the auto-lock idle timer).
     call(&state, None, "companion_getStatus", json!({})).await;
-    assert!(state.last_activity_ms() > before, "an RPC request should record activity");
+    assert!(
+        state.last_activity_ms() > before,
+        "an RPC request should record activity"
+    );
 }
 
 #[tokio::test]
@@ -1281,8 +1513,11 @@ async fn estimate_fee_returns_canonical_hex_bounds() {
     .await;
     let r = resp.result.expect("estimate");
     assert_eq!(r["nonce"], json!("0x9")); // from the mock node
-    assert_eq!(r["resource_bounds"]["l2_gas"]["max_amount"], json!("0x30d40")); // 200000 hex
-    // No prompt was needed (estimate doesn't sign) and no node → error.
+    assert_eq!(
+        r["resource_bounds"]["l2_gas"]["max_amount"],
+        json!("0x30d40")
+    ); // 200000 hex
+       // No prompt was needed (estimate doesn't sign) and no node → error.
 }
 
 #[tokio::test]
@@ -1304,8 +1539,15 @@ async fn estimate_fee_without_node_errors() {
 async fn get_status_reports_grant_state() {
     let state = state_with(Decision::Approve, false);
     let token = pair(&state, "agent").await;
-    let id = state.clients.lock().await.list().into_iter()
-        .find(|c| c.label == "agent-client").map(|c| c.id).unwrap();
+    let id = state
+        .clients
+        .lock()
+        .await
+        .list()
+        .into_iter()
+        .find(|c| c.label == "agent-client")
+        .map(|c| c.id)
+        .unwrap();
 
     // Unauthenticated getStatus → grant is null.
     let anon = call(&state, None, "companion_getStatus", json!({})).await;
@@ -1358,7 +1600,13 @@ async fn node_can_be_set_and_cleared_at_runtime() {
     let token = pair(&state, "app").await;
     let mut p = invoke_params(&address);
     p["submit"] = json!(true);
-    let before = call(&state, Some(&token), "wallet_addInvokeTransaction", p.clone()).await;
+    let before = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        p.clone(),
+    )
+    .await;
     assert_eq!(err_code(&before), -32005);
     assert!(!state.has_node_for(ChainId::Sepolia));
 
@@ -1375,7 +1623,13 @@ async fn node_can_be_set_and_cleared_at_runtime() {
         })),
     );
     assert!(state.has_node_for(ChainId::Sepolia));
-    let after = call(&state, Some(&token), "wallet_addInvokeTransaction", p.clone()).await;
+    let after = call(
+        &state,
+        Some(&token),
+        "wallet_addInvokeTransaction",
+        p.clone(),
+    )
+    .await;
     assert_eq!(after.result.unwrap()["transaction_hash"], json!("0xcafe"));
 
     // Clear it again → back to NoNode.
@@ -1423,7 +1677,13 @@ async fn switch_chain_rejected_maps_to_113() {
     let state = state_rejecting(&["wallet_switchStarknetChain"]);
     let token = pair(&state, "app").await;
     let sn_main = format!("0x{:x}", wallet_core::Felt::from_bytes_be_slice(b"SN_MAIN"));
-    let resp = call(&state, Some(&token), "wallet_switchStarknetChain", json!({ "chainId": sn_main })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "wallet_switchStarknetChain",
+        json!({ "chainId": sn_main }),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113);
 }
 
@@ -1460,8 +1720,17 @@ async fn agent_with_account_and_id(state: &ServerState) -> (String, String, Stri
     let r = resp.result.unwrap();
     let token = r["token"].as_str().unwrap().to_string();
     let id = r["client_id"].as_str().unwrap().to_string();
-    let created = call(state, Some(&token), "companion_createAgentAccount", json!({"label": "a"})).await;
-    let addr = created.result.unwrap()["address"].as_str().unwrap().to_string();
+    let created = call(
+        state,
+        Some(&token),
+        "companion_createAgentAccount",
+        json!({"label": "a"}),
+    )
+    .await;
+    let addr = created.result.unwrap()["address"]
+        .as_str()
+        .unwrap()
+        .to_string();
     (token, id, addr)
 }
 
@@ -1480,11 +1749,20 @@ async fn active_grant_auto_approves_agent_signing() {
     let client_id = {
         // Recover the client id by listing.
         let list = state.clients.lock().await.list();
-        list.into_iter().find(|c| c.label == "agent-client").map(|c| c.id).unwrap()
+        list.into_iter()
+            .find(|c| c.label == "agent-client")
+            .map(|c| c.id)
+            .unwrap()
     };
     grant_forever(&state, &client_id).await;
 
-    let created = call(&state, Some(&agent), "companion_createAgentAccount", json!({"label": "a"})).await;
+    let created = call(
+        &state,
+        Some(&agent),
+        "companion_createAgentAccount",
+        json!({"label": "a"}),
+    )
+    .await;
     let addr = created.result.expect("create auto-approved under grant")["address"]
         .as_str()
         .unwrap()
@@ -1508,8 +1786,18 @@ async fn grant_does_not_auto_approve_funding() {
     let (token, id, _addr) = agent_with_account_and_id(&state).await;
     grant_forever(&state, &id).await;
 
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("1000")).await;
-    assert_eq!(err_code(&resp), 113, "funding must require approval even with a grant");
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("1000"),
+    )
+    .await;
+    assert_eq!(
+        err_code(&resp),
+        113,
+        "funding must require approval even with a grant"
+    );
 }
 
 #[tokio::test]
@@ -1519,20 +1807,35 @@ async fn revoked_or_expired_grant_prompts_again() {
 
     // Expired grant (until in the past) → still prompts → rejected.
     state.clients.lock().await.grant(&id, 1);
-    let r1 = call(&state, Some(&token), "wallet_signTypedData",
-        json!({"account_address": addr, "typed_data": sample_typed_data()})).await;
+    let r1 = call(
+        &state,
+        Some(&token),
+        "wallet_signTypedData",
+        json!({"account_address": addr, "typed_data": sample_typed_data()}),
+    )
+    .await;
     assert_eq!(err_code(&r1), 113);
 
     // Active grant → auto-approves.
     grant_forever(&state, &id).await;
-    let r2 = call(&state, Some(&token), "wallet_signTypedData",
-        json!({"account_address": addr, "typed_data": sample_typed_data()})).await;
+    let r2 = call(
+        &state,
+        Some(&token),
+        "wallet_signTypedData",
+        json!({"account_address": addr, "typed_data": sample_typed_data()}),
+    )
+    .await;
     assert!(r2.result.is_some());
 
     // Revoke → prompts again → rejected.
     assert!(state.clients.lock().await.revoke_grant(&id));
-    let r3 = call(&state, Some(&token), "wallet_signTypedData",
-        json!({"account_address": addr, "typed_data": sample_typed_data()})).await;
+    let r3 = call(
+        &state,
+        Some(&token),
+        "wallet_signTypedData",
+        json!({"account_address": addr, "typed_data": sample_typed_data()}),
+    )
+    .await;
     assert_eq!(err_code(&r3), 113);
 }
 
@@ -1609,8 +1912,17 @@ fn funding_params(amount: &str) -> Value {
 /// Pair an agent and give it one account; return (token, agent_account_address).
 async fn agent_with_account(state: &ServerState) -> (String, String) {
     let token = pair(state, "agent").await;
-    let created = call(state, Some(&token), "companion_createAgentAccount", json!({"label": "bot"})).await;
-    let addr = created.result.unwrap()["address"].as_str().unwrap().to_string();
+    let created = call(
+        state,
+        Some(&token),
+        "companion_createAgentAccount",
+        json!({"label": "bot"}),
+    )
+    .await;
+    let addr = created.result.unwrap()["address"]
+        .as_str()
+        .unwrap()
+        .to_string();
     (token, addr)
 }
 
@@ -1621,10 +1933,19 @@ async fn funding_errors_clearly_when_manager_not_deployed() {
     // opaque node "Contract not found" (GitHub issue #1).
     let state = state_with_node_opts(Decision::Approve, "0x3", "0xfeed", vec![], false);
     let (token, _) = agent_with_account(&state).await;
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("1000")).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("1000"),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006);
     let msg = resp.error.unwrap().message;
-    assert!(msg.contains("not deployed"), "message should explain the cause: {msg}");
+    assert!(
+        msg.contains("not deployed"),
+        "message should explain the cause: {msg}"
+    );
 }
 
 #[tokio::test]
@@ -1634,15 +1955,34 @@ async fn a_funding_source_index_on_the_agent_branch_is_refused() {
     // it via the hardened bit, and a u64 truncated onto it. None may sign.
     let state = state_with_node_opts(Decision::Approve, "0x3", "0xfeed", vec![], true);
     let (token, _) = agent_with_account(&state).await;
-    for idx in [json!(0x4147_4E54u64), json!(0xC147_4E54u64), json!(0x1_4147_4E54u64), json!("1")] {
+    for idx in [
+        json!(0x4147_4E54u64),
+        json!(0xC147_4E54u64),
+        json!(0x1_4147_4E54u64),
+        json!("1"),
+    ] {
         let mut p = funding_params("1000");
         p["funding_source_index"] = idx.clone();
         let resp = call(&state, Some(&token), "companion_requestFunding", p).await;
-        assert_eq!(err_code(&resp), 114, "{idx} must be refused as an invalid request");
+        assert_eq!(
+            err_code(&resp),
+            114,
+            "{idx} must be refused as an invalid request"
+        );
     }
     // Control: the default index is accepted (so the refusals above are the bound).
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("1000")).await;
-    assert!(resp.error.as_ref().map(|e| e.code != 114).unwrap_or(true), "{:?}", resp.error);
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("1000"),
+    )
+    .await;
+    assert!(
+        resp.error.as_ref().map(|e| e.code != 114).unwrap_or(true),
+        "{:?}",
+        resp.error
+    );
 }
 
 #[tokio::test]
@@ -1652,7 +1992,13 @@ async fn deploy_account_already_deployed_errors() {
     // when the UI let them click Deploy twice).
     let state = state_with_node_opts(Decision::Approve, "0x0", "0xdeed", vec![], true);
     let (agent, _) = agent_with_account(&state).await;
-    let resp = call(&state, Some(&agent), "companion_deployAccount", json!({ "submit": true })).await;
+    let resp = call(
+        &state,
+        Some(&agent),
+        "companion_deployAccount",
+        json!({ "submit": true }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006);
     assert!(resp.error.unwrap().message.contains("already deployed"));
 }
@@ -1674,17 +2020,32 @@ async fn agent_requests_funding_and_gets_signed_transfer() {
     let (_, manager_addr) = user_registry();
     let (token, agent_addr) = agent_with_account(&state).await;
 
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("5000000000000000000")).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("5000000000000000000"),
+    )
+    .await;
     let r = resp.result.expect("expected signed funding transfer");
 
     assert_eq!(r["submitted"], json!(false));
     assert_eq!(r["amount"], json!("5000000000000000000"));
     // Sender is the manager (user root), NOT chosen by the agent.
-    assert_eq!(r["signed_transaction"]["sender_address"], json!(manager_addr));
+    assert_eq!(
+        r["signed_transaction"]["sender_address"],
+        json!(manager_addr)
+    );
     // Recipient defaults to the agent's own account.
     assert_eq!(r["recipient"], json!(agent_addr));
     // One transfer call → encoded calldata [1, token, selector, 3, to, low, high] = 7.
-    assert_eq!(r["signed_transaction"]["calldata"].as_array().unwrap().len(), 7);
+    assert_eq!(
+        r["signed_transaction"]["calldata"]
+            .as_array()
+            .unwrap()
+            .len(),
+        7
+    );
     assert_eq!(r["signature"].as_array().unwrap().len(), 2);
 }
 
@@ -1692,7 +2053,13 @@ async fn agent_requests_funding_and_gets_signed_transfer() {
 async fn funding_rejected_maps_to_113() {
     let state = state_rejecting(&["companion_requestFunding"]);
     let (token, _) = agent_with_account(&state).await;
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("1000")).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("1000"),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113);
 }
 
@@ -1700,7 +2067,13 @@ async fn funding_rejected_maps_to_113() {
 async fn app_client_cannot_request_funding() {
     let state = state_with(Decision::Approve, false);
     let app = pair(&state, "app").await;
-    let resp = call(&state, Some(&app), "companion_requestFunding", funding_params("1000")).await;
+    let resp = call(
+        &state,
+        Some(&app),
+        "companion_requestFunding",
+        funding_params("1000"),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32002); // Forbidden
 }
 
@@ -1720,7 +2093,13 @@ async fn agent_cannot_fund_an_account_it_does_not_own() {
 async fn funding_rejects_zero_amount() {
     let state = state_with(Decision::Approve, false);
     let (token, _) = agent_with_account(&state).await;
-    let resp = call(&state, Some(&token), "companion_requestFunding", funding_params("0")).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_requestFunding",
+        funding_params("0"),
+    )
+    .await;
     assert_eq!(err_code(&resp), 114);
 }
 
@@ -1744,14 +2123,19 @@ async fn report_issue_builds_prefilled_github_url() {
     let v = resp.result.expect("report_issue should succeed");
     let url = v["url"].as_str().unwrap();
     assert!(
-        url.starts_with("https://github.com/starknet-innovation/bramble-companion/issues/new?title="),
+        url.starts_with(
+            "https://github.com/starknet-innovation/bramble-companion/issues/new?title="
+        ),
         "url = {url}"
     );
     assert!(url.contains("&body="));
     // Agent-authored text is percent-encoded — no raw space/newline escapes the query.
     assert!(!url.contains(' '));
     assert!(!url.contains('\n'));
-    assert!(v["title"].as_str().unwrap().starts_with("[agent-feedback] "));
+    assert!(v["title"]
+        .as_str()
+        .unwrap()
+        .starts_with("[agent-feedback] "));
     assert_eq!(v["filed"], json!(false));
     assert_eq!(v["repo"], json!("starknet-innovation/bramble-companion"));
     let body = v["body"].as_str().unwrap();
@@ -1853,8 +2237,11 @@ impl prover::Prover for StubProver {
 /// `ProverState` backed by the stub, attached to a fresh server (no native
 /// binary or network needed).
 fn state_with_prover(tag: &str) -> Arc<ServerState> {
-    let data_dir =
-        std::env::temp_dir().join(format!("bramble-companion-rpc-prove-test-{}-{}", tag, std::process::id()));
+    let data_dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-prove-test-{}-{}",
+        tag,
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&data_dir);
     let pstate = Arc::new(prover::ProverState {
         prover: Arc::new(StubProver),
@@ -1877,7 +2264,13 @@ async fn companion_prove_enqueues_and_status_reports_success() {
     let token = pair(&state, "app").await;
 
     // Proving requires a paired token like every other operational method.
-    let unauth = call(&state, None, "companion_prove", json!({ "payload": { "x": 1 } })).await;
+    let unauth = call(
+        &state,
+        None,
+        "companion_prove",
+        json!({ "payload": { "x": 1 } }),
+    )
+    .await;
     assert_eq!(err_code(&unauth), 118); // NOT_REGISTERED
 
     let resp = call(
@@ -1894,10 +2287,15 @@ async fn companion_prove_enqueues_and_status_reports_success() {
     // Poll companion_proveStatus until terminal.
     let mut job = json!({});
     for _ in 0..200 {
-        let s = call(&state, Some(&token), "companion_proveStatus", json!({ "job_id": job_id }))
-            .await
-            .result
-            .expect("status ok");
+        let s = call(
+            &state,
+            Some(&token),
+            "companion_proveStatus",
+            json!({ "job_id": job_id }),
+        )
+        .await
+        .result
+        .expect("status ok");
         if s["status"] == json!("succeeded") || s["status"] == json!("failed") {
             job = s;
             break;
@@ -1912,15 +2310,23 @@ async fn companion_prove_enqueues_and_status_reports_success() {
         .await
         .result
         .expect("activity ok");
-    assert!(act["activity"].as_array().map(|a| !a.is_empty()).unwrap_or(false));
+    assert!(act["activity"]
+        .as_array()
+        .map(|a| !a.is_empty())
+        .unwrap_or(false));
 }
 
 #[tokio::test]
 async fn companion_prove_unknown_job_is_invalid_request() {
     let state = state_with_prover("unknown");
     let token = pair(&state, "app").await;
-    let resp =
-        call(&state, Some(&token), "companion_proveStatus", json!({ "job_id": "p999" })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_proveStatus",
+        json!({ "job_id": "p999" }),
+    )
+    .await;
     assert_eq!(err_code(&resp), 114); // INVALID_REQUEST
 }
 
@@ -1929,7 +2335,13 @@ async fn companion_prove_without_prover_is_not_implemented() {
     // No prover attached → clean -32601, not a panic.
     let state = state_with(Decision::Approve, false);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "companion_prove", json!({ "payload": {} })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_prove",
+        json!({ "payload": {} }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32601); // NOT_IMPLEMENTED
 }
 
@@ -1942,7 +2354,13 @@ async fn sign_and_prove_signs_the_virtual_tx_and_enqueues_it() {
     let (_, address) = user_registry();
     let token = pair(&state, "app").await;
 
-    let resp = call(&state, Some(&token), "companion_signAndProve", invoke_params(&address)).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_signAndProve",
+        invoke_params(&address),
+    )
+    .await;
     let r = resp.result.expect("sign-and-prove enqueued");
     assert_eq!(r["status"], json!("queued"));
     assert!(r["transaction_hash"].as_str().unwrap().starts_with("0x"));
@@ -1950,10 +2368,15 @@ async fn sign_and_prove_signs_the_virtual_tx_and_enqueues_it() {
 
     let mut job = json!({});
     for _ in 0..200 {
-        let s = call(&state, Some(&token), "companion_proveStatus", json!({ "job_id": job_id }))
-            .await
-            .result
-            .expect("status ok");
+        let s = call(
+            &state,
+            Some(&token),
+            "companion_proveStatus",
+            json!({ "job_id": job_id }),
+        )
+        .await
+        .result
+        .expect("status ok");
         if s["status"] == json!("succeeded") || s["status"] == json!("failed") {
             job = s;
             break;
@@ -1993,7 +2416,10 @@ async fn sign_and_prove_rejected_maps_to_113() {
             let _ = pending.respond.send(decision);
         }
     });
-    let dir = std::env::temp_dir().join(format!("bramble-companion-rpc-prove-rej-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-prove-rej-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let pstate = Arc::new(prover::ProverState {
         prover: Arc::new(StubProver),
@@ -2002,12 +2428,21 @@ async fn sign_and_prove_rejected_maps_to_113() {
         storage: Arc::new(prover::Storage::new(dir.join("storage"))),
     });
     let state = Arc::new(
-        ServerState::new(Arc::new(Mutex::new(make_session(false))), Arc::new(approver))
-            .with_prover(pstate),
+        ServerState::new(
+            Arc::new(Mutex::new(make_session(false))),
+            Arc::new(approver),
+        )
+        .with_prover(pstate),
     );
     let (_, address) = user_registry();
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "companion_signAndProve", invoke_params(&address)).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_signAndProve",
+        invoke_params(&address),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113); // USER_REFUSED
 }
 
@@ -2033,13 +2468,20 @@ impl StarknetRpc for Strk20Node {
             // Every pool view (`get_public_key`, ...) reads zero: not registered.
             "starknet_call" => Ok(json!(["0x0"])),
             "starknet_getClassHashAt" => {
-                self.class_hash_queries.lock().unwrap().push(params["block_id"].clone());
+                self.class_hash_queries
+                    .lock()
+                    .unwrap()
+                    .push(params["block_id"].clone());
                 if self.block_error {
-                    return Err(NodeError::Rpc(r#"{"code":24,"message":"Block not found"}"#.into()));
+                    return Err(NodeError::Rpc(
+                        r#"{"code":24,"message":"Block not found"}"#.into(),
+                    ));
                 }
                 match params["block_id"]["block_number"].as_u64() {
                     Some(b) if b >= self.deployed_from => Ok(json!("0x1234")),
-                    _ => Err(NodeError::Rpc(r#"{"code":20,"message":"Contract not found"}"#.into())),
+                    _ => Err(NodeError::Rpc(
+                        r#"{"code":20,"message":"Contract not found"}"#.into(),
+                    )),
                 }
             }
             m => Err(NodeError::Rpc(format!("{m}: unexpected in this test"))),
@@ -2048,7 +2490,12 @@ impl StarknetRpc for Strk20Node {
     async fn get_nonce(&self, _: &Felt) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_invoke(&self, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_invoke(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
     async fn add_invoke(
@@ -2134,7 +2581,10 @@ async fn strk20_register_with(tag: &str, node: Arc<Strk20Node>) -> Response {
             let _ = pending.respond.send(decision);
         }
     });
-    let dir = std::env::temp_dir().join(format!("bramble-companion-rpc-strk20-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-strk20-{tag}-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let pstate = Arc::new(prover::ProverState {
         prover: Arc::new(StubProver),
@@ -2143,8 +2593,11 @@ async fn strk20_register_with(tag: &str, node: Arc<Strk20Node>) -> Response {
         storage: Arc::new(prover::Storage::new(dir.join("storage"))),
     });
     let state = Arc::new(
-        ServerState::new(Arc::new(Mutex::new(make_session(false))), Arc::new(approver))
-            .with_prover(pstate),
+        ServerState::new(
+            Arc::new(Mutex::new(make_session(false))),
+            Arc::new(approver),
+        )
+        .with_prover(pstate),
     );
     state.set_node(ChainId::Sepolia, Some(node));
     let token = pair(&state, "app").await;
@@ -2162,7 +2615,10 @@ async fn strk20_register_refuses_an_account_not_deployed_at_the_proving_block() 
     assert_eq!(err_code(&resp), -32006, "{:?}", resp.error);
     let msg = resp.error.unwrap().message;
     assert!(msg.contains("not deployed at reference block 988"), "{msg}");
-    assert!(msg.contains("12 blocks behind") && msg.contains("about a minute"), "{msg}");
+    assert!(
+        msg.contains("12 blocks behind") && msg.contains("about a minute"),
+        "{msg}"
+    );
     assert_eq!(
         *node.class_hash_queries.lock().unwrap(),
         vec![json!({ "block_number": 988 })]
@@ -2211,16 +2667,24 @@ impl StarknetRpc for OwnerNode {
     async fn raw(&self, method: &str, params: Value) -> Result<Value, NodeError> {
         match method {
             "starknet_getClassHashAt" => {
-                assert_eq!(params["contract_address"], json!(format!("{:#x}", Felt::from_hex(OWNER).unwrap())));
+                assert_eq!(
+                    params["contract_address"],
+                    json!(format!("{:#x}", Felt::from_hex(OWNER).unwrap()))
+                );
                 if self.deployed {
                     Ok(json!("0x1234"))
                 } else {
-                    Err(NodeError::Rpc(r#"{"code":20,"message":"Contract not found"}"#.into()))
+                    Err(NodeError::Rpc(
+                        r#"{"code":20,"message":"Contract not found"}"#.into(),
+                    ))
                 }
             }
             "starknet_call" => {
                 let selector = params["request"]["entry_point_selector"].as_str().unwrap();
-                let src5 = format!("{:#x}", wallet_core::get_selector_from_name("supports_interface"));
+                let src5 = format!(
+                    "{:#x}",
+                    wallet_core::get_selector_from_name("supports_interface")
+                );
                 if selector == src5 {
                     assert_eq!(
                         params["request"]["calldata"],
@@ -2245,7 +2709,12 @@ impl StarknetRpc for OwnerNode {
     async fn get_nonce(&self, _: &Felt) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_invoke(&self, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_invoke(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
     async fn add_invoke(
@@ -2266,16 +2735,43 @@ impl StarknetRpc for OwnerNode {
     async fn balance_of(&self, _: &Felt, _: &Felt) -> Result<u128, NodeError> {
         unimplemented!()
     }
-    async fn estimate_deploy_account(&self, _: &Felt, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_deploy_account(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_deploy_account(&self, _: &Felt, _: &[Felt], _: &Felt, _: &[Felt], _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_deploy_account(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+        _: &[Felt],
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &[Felt], _: &Felt, _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &[Felt],
+        _: &Felt,
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
 }
@@ -2289,14 +2785,24 @@ struct RecordingApprover {
 #[async_trait]
 impl wallet_rpc::Approver for RecordingApprover {
     async fn request_approval(&self, req: wallet_rpc::ApprovalRequest) -> Decision {
-        let decision = if self.reject.contains(&req.method.as_str()) { Decision::Reject } else { Decision::Approve };
+        let decision = if self.reject.contains(&req.method.as_str()) {
+            Decision::Reject
+        } else {
+            Decision::Approve
+        };
         self.prompts.lock().unwrap().push(req);
         decision
     }
 }
 
-fn owner_state(node: OwnerNode, reject: &'static [&'static str]) -> (Arc<ServerState>, Arc<RecordingApprover>) {
-    let approver = Arc::new(RecordingApprover { reject, prompts: Default::default() });
+fn owner_state(
+    node: OwnerNode,
+    reject: &'static [&'static str],
+) -> (Arc<ServerState>, Arc<RecordingApprover>) {
+    let approver = Arc::new(RecordingApprover {
+        reject,
+        prompts: Default::default(),
+    });
     let state = Arc::new(
         ServerState::new(Arc::new(Mutex::new(make_session(false))), approver.clone())
             .with_node(ChainId::Sepolia, Arc::new(node)),
@@ -2305,15 +2811,28 @@ fn owner_state(node: OwnerNode, reject: &'static [&'static str]) -> (Arc<ServerS
 }
 
 fn owner_node(deployed: bool, src5: Src5) -> OwnerNode {
-    OwnerNode { deployed, src5, registered_key: Felt::ZERO }
+    OwnerNode {
+        deployed,
+        src5,
+        registered_key: Felt::ZERO,
+    }
 }
 
 fn prompted(approver: &RecordingApprover, method: &str) -> Vec<String> {
-    approver.prompts.lock().unwrap().iter().filter(|p| p.method == method).map(|p| p.summary.clone()).collect()
+    approver
+        .prompts
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|p| p.method == method)
+        .map(|p| p.summary.clone())
+        .collect()
 }
 
 fn reason(resp: &Response) -> Option<String> {
-    resp.error.as_ref()?.data.as_ref()?["reason"].as_str().map(str::to_string)
+    resp.error.as_ref()?.data.as_ref()?["reason"]
+        .as_str()
+        .map(str::to_string)
 }
 
 /// The owner's viewing public key as Bramble Companion derives it from user account 0
@@ -2338,28 +2857,65 @@ async fn add_owner_enrols_after_a_prompt_and_lists_it() {
     let token = pair(&state, "app").await;
     let (_, controller) = user_registry();
 
-    let resp = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": "0xc0ffee", "label": "vault" })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": "0xc0ffee", "label": "vault" }),
+    )
+    .await;
     let r = resp.result.unwrap_or_else(|| panic!("{:?}", resp.error));
     assert_eq!(r["owner_address"], json!(OWNER));
     assert_eq!(r["controller"]["address"], json!(controller));
     assert_eq!(r["chain"], json!("SN_SEPOLIA"));
     assert_eq!(r["registered"], json!(false));
-    assert_eq!(r["viewing_public_key"], json!(format!("{:#x}", expected_owner_public_key())));
+    assert_eq!(
+        r["viewing_public_key"],
+        json!(format!("{:#x}", expected_owner_public_key()))
+    );
     // Only the public key comes back: no field carries the viewing key.
-    assert!(r.as_object().unwrap().keys().all(|k| !k.contains("sk") && k != "viewing_key"), "{r}");
+    assert!(
+        r.as_object()
+            .unwrap()
+            .keys()
+            .all(|k| !k.contains("sk") && k != "viewing_key"),
+        "{r}"
+    );
 
     let prompts = prompted(&approver, "companion_strk20AddOwner");
     assert_eq!(prompts.len(), 1);
-    assert!(prompts[0].contains(OWNER) && prompts[0].contains(&controller), "{}", prompts[0]);
-    assert!(prompts[0].contains("cannot check who controls this contract"), "{}", prompts[0]);
+    assert!(
+        prompts[0].contains(OWNER) && prompts[0].contains(&controller),
+        "{}",
+        prompts[0]
+    );
+    assert!(
+        prompts[0].contains("cannot check who controls this contract"),
+        "{}",
+        prompts[0]
+    );
 
-    let list = call(&state, Some(&token), "companion_strk20ListOwners", json!({})).await.result.unwrap();
+    let list = call(
+        &state,
+        Some(&token),
+        "companion_strk20ListOwners",
+        json!({}),
+    )
+    .await
+    .result
+    .unwrap();
     assert_eq!(list.as_array().unwrap().len(), 1);
     assert_eq!(list[0]["owner_address"], json!(OWNER));
     assert_eq!(list[0]["label"], json!("vault"));
 
     // Enrolling it again in the same scope is refused.
-    let again = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+    let again = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&again), -32006);
     assert_eq!(reason(&again).as_deref(), Some("OWNER_ALREADY_ENROLLED"));
 }
@@ -2368,10 +2924,22 @@ async fn add_owner_enrols_after_a_prompt_and_lists_it() {
 /// derives enrols, and reports `registered: true`.
 #[tokio::test]
 async fn add_owner_accepts_a_registration_under_the_derived_key() {
-    let node = OwnerNode { deployed: true, src5: Src5::Yes, registered_key: expected_owner_public_key() };
+    let node = OwnerNode {
+        deployed: true,
+        src5: Src5::Yes,
+        registered_key: expected_owner_public_key(),
+    };
     let (state, _) = owner_state(node, &[]);
     let token = pair(&state, "app").await;
-    let r = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await.result.unwrap();
+    let r = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await
+    .result
+    .unwrap();
     assert_eq!(r["registered"], json!(true));
 }
 
@@ -2383,10 +2951,24 @@ async fn add_owner_prompts_even_under_an_active_grant() {
     let (token, id, _) = agent_with_account_and_id(&state).await;
     grant_forever(&state, &id).await;
 
-    let resp = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113, "{:?}", resp.error);
     assert_eq!(prompted(&approver, "companion_strk20AddOwner").len(), 1);
-    let list = call(&state, Some(&token), "companion_strk20ListOwners", json!({})).await.result.unwrap();
+    let list = call(
+        &state,
+        Some(&token),
+        "companion_strk20ListOwners",
+        json!({}),
+    )
+    .await
+    .result
+    .unwrap();
     assert_eq!(list, json!([]));
 }
 
@@ -2394,10 +2976,21 @@ async fn add_owner_prompts_even_under_an_active_grant() {
 async fn add_owner_refuses_an_undeployed_owner() {
     let (state, approver) = owner_state(owner_node(false, Src5::Yes), &[]);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006, "{:?}", resp.error);
     assert_eq!(reason(&resp).as_deref(), Some("OWNER_NOT_DEPLOYED"));
-    assert!(resp.error.as_ref().unwrap().message.starts_with("OWNER_NOT_DEPLOYED: "));
+    assert!(resp
+        .error
+        .as_ref()
+        .unwrap()
+        .message
+        .starts_with("OWNER_NOT_DEPLOYED: "));
     assert!(prompted(&approver, "companion_strk20AddOwner").is_empty());
 }
 
@@ -2406,7 +2999,13 @@ async fn add_owner_refuses_an_owner_without_custom_validation() {
     for src5 in [Src5::No, Src5::Reverts] {
         let (state, approver) = owner_state(owner_node(true, src5), &[]);
         let token = pair(&state, "app").await;
-        let resp = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+        let resp = call(
+            &state,
+            Some(&token),
+            "companion_strk20AddOwner",
+            json!({ "owner_address": OWNER }),
+        )
+        .await;
         assert_eq!(err_code(&resp), -32006, "{:?}", resp.error);
         assert_eq!(reason(&resp).as_deref(), Some("OWNER_NO_CUSTOM_VALIDATION"));
         assert!(prompted(&approver, "companion_strk20AddOwner").is_empty());
@@ -2416,10 +3015,20 @@ async fn add_owner_refuses_an_owner_without_custom_validation() {
 /// D8: registered with the pool under a key this controller doesn't derive.
 #[tokio::test]
 async fn add_owner_refuses_a_foreign_registration() {
-    let node = OwnerNode { deployed: true, src5: Src5::Yes, registered_key: Felt::from_hex("0x1234abcd").unwrap() };
+    let node = OwnerNode {
+        deployed: true,
+        src5: Src5::Yes,
+        registered_key: Felt::from_hex("0x1234abcd").unwrap(),
+    };
     let (state, approver) = owner_state(node, &[]);
     let token = pair(&state, "app").await;
-    let resp = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&resp), -32006, "{:?}", resp.error);
     assert_eq!(reason(&resp).as_deref(), Some("OWNER_KEY_MISMATCH"));
     assert!(prompted(&approver, "companion_strk20AddOwner").is_empty());
@@ -2430,15 +3039,31 @@ async fn add_owner_validates_its_params() {
     let (state, _) = owner_state(owner_node(true, Src5::Yes), &[]);
     let token = pair(&state, "app").await;
     let (_, controller) = user_registry();
-    for params in [json!({}), json!({ "owner_address": "0x0" }), json!({ "owner_address": "nope" })] {
-        assert_eq!(err_code(&call(&state, Some(&token), "companion_strk20AddOwner", params).await), 114);
+    for params in [
+        json!({}),
+        json!({ "owner_address": "0x0" }),
+        json!({ "owner_address": "nope" }),
+    ] {
+        assert_eq!(
+            err_code(&call(&state, Some(&token), "companion_strk20AddOwner", params).await),
+            114
+        );
     }
     // A Bramble Companion account is not an external owner.
-    let own = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": controller })).await;
+    let own = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": controller }),
+    )
+    .await;
     assert_eq!(err_code(&own), 114);
     // The controller must be in the caller's scope.
     let foreign = json!({ "owner_address": OWNER, "account_address": "0x123" });
-    assert_eq!(err_code(&call(&state, Some(&token), "companion_strk20AddOwner", foreign).await), -32002);
+    assert_eq!(
+        err_code(&call(&state, Some(&token), "companion_strk20AddOwner", foreign).await),
+        -32002
+    );
 }
 
 /// Owners are scoped like accounts: agent B neither lists nor uses nor removes
@@ -2450,29 +3075,67 @@ async fn owners_are_scoped_to_the_enrolling_client() {
     let (token_b, _, _) = agent_with_account_and_id(&state).await;
     let app = pair(&state, "app").await;
 
-    let r = call(&state, Some(&token_a), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await;
+    let r = call(
+        &state,
+        Some(&token_a),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     let r = r.result.unwrap_or_else(|| panic!("{:?}", r.error));
-    assert_eq!(r["controller"]["address"], json!(account_a), "an agent's controller is its own account");
+    assert_eq!(
+        r["controller"]["address"],
+        json!(account_a),
+        "an agent's controller is its own account"
+    );
 
     let listed = |token: String| {
         let state = state.clone();
-        async move { call(&state, Some(&token), "companion_strk20ListOwners", json!({})).await.result.unwrap() }
+        async move {
+            call(
+                &state,
+                Some(&token),
+                "companion_strk20ListOwners",
+                json!({}),
+            )
+            .await
+            .result
+            .unwrap()
+        }
     };
     assert_eq!(listed(token_a.clone()).await.as_array().unwrap().len(), 1);
     assert_eq!(listed(token_b.clone()).await, json!([]));
     assert_eq!(listed(app.clone()).await, json!([]));
 
     // B can't act on A's owner: OWNER_NOT_ENROLLED, same as an unknown owner.
-    let use_b = call(&state, Some(&token_b), "wallet_strk20Balances", json!({ "tokens": ["0x4718"], "owner_address": OWNER })).await;
+    let use_b = call(
+        &state,
+        Some(&token_b),
+        "wallet_strk20Balances",
+        json!({ "tokens": ["0x4718"], "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&use_b), -32002);
     assert_eq!(reason(&use_b).as_deref(), Some("OWNER_NOT_ENROLLED"));
-    let rm_b = call(&state, Some(&token_b), "companion_strk20RemoveOwner", json!({ "owner_address": OWNER })).await;
+    let rm_b = call(
+        &state,
+        Some(&token_b),
+        "companion_strk20RemoveOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&rm_b), -32002);
     assert_eq!(reason(&rm_b).as_deref(), Some("OWNER_NOT_ENROLLED"));
     assert_eq!(listed(token_a.clone()).await.as_array().unwrap().len(), 1);
 
     // A's owner resolves for A; the one-shot methods don't take owners yet.
-    let use_a = call(&state, Some(&token_a), "wallet_strk20Balances", json!({ "tokens": ["0x4718"], "owner_address": OWNER })).await;
+    let use_a = call(
+        &state,
+        Some(&token_a),
+        "wallet_strk20Balances",
+        json!({ "tokens": ["0x4718"], "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&use_a), -32601, "{:?}", use_a.error);
 }
 
@@ -2480,27 +3143,80 @@ async fn owners_are_scoped_to_the_enrolling_client() {
 async fn remove_owner_prompts_and_forgets_it() {
     let (state, approver) = owner_state(owner_node(true, Src5::Yes), &[]);
     let token = pair(&state, "app").await;
-    call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await.result.unwrap();
+    call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await
+    .result
+    .unwrap();
 
-    let resp = call(&state, Some(&token), "companion_strk20RemoveOwner", json!({ "owner_address": "0xc0ffee" })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20RemoveOwner",
+        json!({ "owner_address": "0xc0ffee" }),
+    )
+    .await;
     assert_eq!(resp.result, Some(json!(true)), "{:?}", resp.error);
     assert_eq!(prompted(&approver, "companion_strk20RemoveOwner").len(), 1);
-    let list = call(&state, Some(&token), "companion_strk20ListOwners", json!({})).await.result.unwrap();
+    let list = call(
+        &state,
+        Some(&token),
+        "companion_strk20ListOwners",
+        json!({}),
+    )
+    .await
+    .result
+    .unwrap();
     assert_eq!(list, json!([]));
 
-    let again = call(&state, Some(&token), "companion_strk20RemoveOwner", json!({ "owner_address": OWNER })).await;
+    let again = call(
+        &state,
+        Some(&token),
+        "companion_strk20RemoveOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&again), -32002);
     assert_eq!(reason(&again).as_deref(), Some("OWNER_NOT_ENROLLED"));
 }
 
 #[tokio::test]
 async fn remove_owner_refused_keeps_it() {
-    let (state, _) = owner_state(owner_node(true, Src5::Yes), &["companion_strk20RemoveOwner"]);
+    let (state, _) = owner_state(
+        owner_node(true, Src5::Yes),
+        &["companion_strk20RemoveOwner"],
+    );
     let token = pair(&state, "app").await;
-    call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER })).await.result.unwrap();
-    let resp = call(&state, Some(&token), "companion_strk20RemoveOwner", json!({ "owner_address": OWNER })).await;
+    call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await
+    .result
+    .unwrap();
+    let resp = call(
+        &state,
+        Some(&token),
+        "companion_strk20RemoveOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(err_code(&resp), 113);
-    let list = call(&state, Some(&token), "companion_strk20ListOwners", json!({})).await.result.unwrap();
+    let list = call(
+        &state,
+        Some(&token),
+        "companion_strk20ListOwners",
+        json!({}),
+    )
+    .await
+    .result
+    .unwrap();
     assert_eq!(list.as_array().unwrap().len(), 1);
 }
 
@@ -2515,7 +3231,13 @@ async fn owner_and_account_address_together_is_114() {
     assert_eq!(err_code(&resp), 114, "{:?}", resp.error);
     assert!(resp.error.unwrap().message.contains("not both"));
     // An unknown owner on its own is OWNER_NOT_ENROLLED.
-    let unknown = call(&state, Some(&token), "wallet_strk20Balances", json!({ "tokens": ["0x4718"], "owner_address": OWNER })).await;
+    let unknown = call(
+        &state,
+        Some(&token),
+        "wallet_strk20Balances",
+        json!({ "tokens": ["0x4718"], "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(reason(&unknown).as_deref(), Some("OWNER_NOT_ENROLLED"));
 }
 
@@ -2525,7 +3247,10 @@ async fn errors_without_a_reason_have_no_data_member() {
     let state = state_with(Decision::Approve, false);
     let resp = call(&state, None, "wallet_requestAccounts", json!({})).await;
     let v = serde_json::to_value(&resp).unwrap();
-    assert_eq!(v["error"], json!({ "code": 118, "message": "caller is not a registered client" }));
+    assert_eq!(
+        v["error"],
+        json!({ "code": 118, "message": "caller is not a registered client" })
+    );
 }
 
 // ── STRK20 plans (#48, part 2: the plan step) ───────────────────────────────
@@ -2544,16 +3269,26 @@ struct PlanNode {
 
 impl PlanNode {
     fn methods(&self) -> Vec<String> {
-        self.calls.lock().unwrap().iter().map(|(m, _)| m.clone()).collect()
-    }
-    /// The `block_id` of every `supports_interface` call.
-    fn src5_blocks(&self) -> Vec<Value> {
-        let src5 = format!("{:#x}", wallet_core::get_selector_from_name("supports_interface"));
         self.calls
             .lock()
             .unwrap()
             .iter()
-            .filter(|(m, p)| m == "starknet_call" && p["request"]["entry_point_selector"] == json!(src5))
+            .map(|(m, _)| m.clone())
+            .collect()
+    }
+    /// The `block_id` of every `supports_interface` call.
+    fn src5_blocks(&self) -> Vec<Value> {
+        let src5 = format!(
+            "{:#x}",
+            wallet_core::get_selector_from_name("supports_interface")
+        );
+        self.calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, p)| {
+                m == "starknet_call" && p["request"]["entry_point_selector"] == json!(src5)
+            })
             .map(|(_, p)| p["block_id"].clone())
             .collect()
     }
@@ -2562,7 +3297,10 @@ impl PlanNode {
 #[async_trait]
 impl StarknetRpc for PlanNode {
     async fn raw(&self, method: &str, params: Value) -> Result<Value, NodeError> {
-        self.calls.lock().unwrap().push((method.to_string(), params.clone()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((method.to_string(), params.clone()));
         match method {
             "starknet_blockNumber" => Ok(json!(self.head)),
             "starknet_getClassHashAt" => Ok(json!("0x1234")),
@@ -2584,7 +3322,12 @@ impl StarknetRpc for PlanNode {
     async fn get_nonce(&self, _: &Felt) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_invoke(&self, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_invoke(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
     async fn add_invoke(
@@ -2605,16 +3348,43 @@ impl StarknetRpc for PlanNode {
     async fn balance_of(&self, _: &Felt, _: &Felt) -> Result<u128, NodeError> {
         unimplemented!()
     }
-    async fn estimate_deploy_account(&self, _: &Felt, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_deploy_account(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_deploy_account(&self, _: &Felt, _: &[Felt], _: &Felt, _: &[Felt], _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_deploy_account(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+        _: &[Felt],
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &[Felt], _: &Felt, _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &[Felt],
+        _: &Felt,
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
 }
@@ -2623,7 +3393,12 @@ const PLAN: &str = "companion_strk20Plan";
 const REVEAL: &str = "companion_strk20Plan (reveal_actions)";
 
 fn plan_node(src5_at_block: bool, registered_key: Felt) -> Arc<PlanNode> {
-    Arc::new(PlanNode { head: 1000, src5_at_block, registered_key, calls: Default::default() })
+    Arc::new(PlanNode {
+        head: 1000,
+        src5_at_block,
+        registered_key,
+        calls: Default::default(),
+    })
 }
 
 /// A server with the stub prover, `node` on Sepolia, and a recording approver
@@ -2633,7 +3408,10 @@ fn plan_state(
     node: Arc<PlanNode>,
     reject: &'static [&'static str],
 ) -> (Arc<ServerState>, Arc<RecordingApprover>) {
-    let dir = std::env::temp_dir().join(format!("bramble-companion-rpc-plan-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-plan-{tag}-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let pstate = Arc::new(prover::ProverState {
         prover: Arc::new(StubProver),
@@ -2641,7 +3419,10 @@ fn plan_state(
         settings: Arc::new(prover::SettingsStore::load(dir.join("settings.json"))),
         storage: Arc::new(prover::Storage::new(dir.join("storage"))),
     });
-    let approver = Arc::new(RecordingApprover { reject, prompts: Default::default() });
+    let approver = Arc::new(RecordingApprover {
+        reject,
+        prompts: Default::default(),
+    });
     let state = Arc::new(
         ServerState::new(Arc::new(Mutex::new(make_session(false))), approver.clone())
             .with_node(ChainId::Sepolia, node)
@@ -2651,7 +3432,13 @@ fn plan_state(
 }
 
 async fn enrol(state: &ServerState, token: &str, label: &str) {
-    let r = call(state, Some(token), "companion_strk20AddOwner", json!({ "owner_address": OWNER, "label": label })).await;
+    let r = call(
+        state,
+        Some(token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER, "label": label }),
+    )
+    .await;
     r.result.unwrap_or_else(|| panic!("enrol: {:?}", r.error));
 }
 
@@ -2684,7 +3471,13 @@ async fn plan_for_an_owner_prompts_signs_nothing_and_returns_a_reproducible_hash
     enrol(&state, &token, "vault").await;
     let before = node.calls.lock().unwrap().len();
 
-    let resp = call(&state, Some(&token), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let resp = call(
+        &state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     let p = resp.result.unwrap_or_else(|| panic!("{:?}", resp.error));
     assert_eq!(p["plan_version"], json!(1));
     assert_eq!(p["plan_block"], json!(988));
@@ -2696,18 +3489,33 @@ async fn plan_for_an_owner_prompts_signs_nothing_and_returns_a_reproducible_hash
     assert_eq!(p["plan_id"].as_str().unwrap().len(), 32);
     let now = wallet_rpc::now_unix_ms();
     let expires = p["expires_at"].as_u64().unwrap();
-    assert!(expires > now + 3_590_000 && expires <= now + 3_600_000, "{expires}");
+    assert!(
+        expires > now + 3_590_000 && expires <= now + 3_600_000,
+        "{expires}"
+    );
     // Register = SetViewingKey + the self-channel.
     assert_eq!(p["summary"]["action_count"], json!(2));
     assert_eq!(p["summary"]["register"], json!(true));
     // No actions without reveal_actions.
     for k in ["client_actions", "client_actions_felts", "actions_revealed"] {
-        assert!(p.get(k).is_none(), "{k} returned without reveal_actions: {p}");
+        assert!(
+            p.get(k).is_none(),
+            "{k} returned without reveal_actions: {p}"
+        );
     }
     // The typed data reproduces plan_hash through companion_typedDataHash.
-    assert_eq!(typed_data_hash(&state, &token, &p).await, felt_of(&p["plan_hash"]));
-    assert_eq!(felt_of(&p["typed_data"]["message"]["actions_hash"]), felt_of(&p["actions_hash"]));
-    assert_eq!(felt_of(&p["typed_data"]["message"]["owner"]), Felt::from_hex(OWNER).unwrap());
+    assert_eq!(
+        typed_data_hash(&state, &token, &p).await,
+        felt_of(&p["plan_hash"])
+    );
+    assert_eq!(
+        felt_of(&p["typed_data"]["message"]["actions_hash"]),
+        felt_of(&p["actions_hash"])
+    );
+    assert_eq!(
+        felt_of(&p["typed_data"]["message"]["owner"]),
+        Felt::from_hex(OWNER).unwrap()
+    );
     assert_eq!(p["typed_data"]["domain"]["name"], json!("strkd.Strk20Plan"));
 
     // One prompt, naming owner, label, controller, chain, action count, pool
@@ -2716,7 +3524,19 @@ async fn plan_for_an_owner_prompts_signs_nothing_and_returns_a_reproducible_hash
     assert_eq!(prompts.len(), 1);
     let text = &prompts[0];
     let pool = format!("{:#x}", sepolia_pool());
-    for (i, want) in [OWNER, "\"vault\"", &controller, "SN_SEPOLIA", "2 action(s)", &pool, "approve this plan on-chain", "Nothing is signed"].iter().enumerate() {
+    for (i, want) in [
+        OWNER,
+        "\"vault\"",
+        &controller,
+        "SN_SEPOLIA",
+        "2 action(s)",
+        &pool,
+        "approve this plan on-chain",
+        "Nothing is signed",
+    ]
+    .iter()
+    .enumerate()
+    {
         assert!(text.contains(want), "prompt lacks expected item #{i}");
     }
     assert!(prompted(&approver, REVEAL).is_empty());
@@ -2724,9 +3544,15 @@ async fn plan_for_an_owner_prompts_signs_nothing_and_returns_a_reproducible_hash
     // SRC5 was re-checked at the reference block. Nothing was signed or
     // proved: no pool-nonce read (it precedes signing), no proving job.
     let calls = node.calls.lock().unwrap()[before..].to_vec();
-    assert!(calls.iter().all(|(m, _)| m != "starknet_getNonce"), "{calls:?}");
+    assert!(
+        calls.iter().all(|(m, _)| m != "starknet_getNonce"),
+        "{calls:?}"
+    );
     assert!(node.src5_blocks().contains(&json!({ "block_number": 988 })));
-    let act = call(&state, Some(&token), "companion_proofActivity", json!({})).await.result.unwrap();
+    let act = call(&state, Some(&token), "companion_proofActivity", json!({}))
+        .await
+        .result
+        .unwrap();
     assert_eq!(act["activity"], json!([]), "{act}");
 }
 
@@ -2746,7 +3572,15 @@ fn felt_spellings(f: Felt) -> [String; 2] {
 #[tokio::test]
 async fn reveal_actions_on_a_register_plan_is_refused_before_its_prompt() {
     for owner in [true, false] {
-        let f = prove_fixture(if owner { "reveal-reg-owner" } else { "reveal-reg-account" }, prove_node(), &[]);
+        let f = prove_fixture(
+            if owner {
+                "reveal-reg-owner"
+            } else {
+                "reveal-reg-account"
+            },
+            prove_node(),
+            &[],
+        );
         let token = if owner {
             let (token, id, _) = agent_with_account_and_id(&f.state).await;
             enrol(&f.state, &token, "").await;
@@ -2781,18 +3615,30 @@ async fn reveal_actions_on_a_register_plan_is_refused_before_its_prompt() {
         };
         let r = call(&f.state, Some(&token), PROVE, prove).await;
         assert!(r.error.is_none(), "prove queues");
-        let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+        let job = poll_job(
+            &f.state,
+            &token,
+            r.result.unwrap()["job_id"].as_str().unwrap(),
+        )
+        .await;
         assert_eq!(job["status"], json!("succeeded"));
         let payloads = f.prover.payloads.lock().unwrap().clone();
         // calldata = [1, pool, compile_actions, len, user, user_sk, 2, 0 (SetViewingKey), random, …]
         let calldata = hexes(&payloads[0]["transaction"]["calldata"]);
-        assert_eq!((calldata[6], calldata[7]), (Felt::TWO, Felt::ZERO), "SetViewingKey first");
+        assert_eq!(
+            (calldata[6], calldata[7]),
+            (Felt::TWO, Felt::ZERO),
+            "SetViewingKey first"
+        );
         let random = calldata[8];
         assert!(random != Felt::ZERO);
 
         let mut seen = vec![p.to_string(), job.to_string()];
         for e in f.state.log.lock().await.recent(100) {
-            seen.push(format!("{} {:?} {:?}", e.outcome, e.params_json, e.result_json));
+            seen.push(format!(
+                "{} {:?} {:?}",
+                e.outcome, e.params_json, e.result_json
+            ));
         }
         for (i, text) in seen.iter().enumerate() {
             for s in felt_spellings(random) {
@@ -2809,14 +3655,30 @@ async fn a_grant_covers_the_plan_prompt() {
     let (token, id, _) = agent_with_account_and_id(&state).await;
     enrol(&state, &token, "").await;
     // Without the grant the (rejecting) prompt shows.
-    let refused = call(&state, Some(&token), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let refused = call(
+        &state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     assert_eq!(err_code(&refused), 113);
     assert_eq!(prompted(&approver, PLAN).len(), 1);
     // A refused plan is not stored, so the next one isn't capped by it.
     grant_forever(&state, &id).await;
-    let p = call(&state, Some(&token), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let p = call(
+        &state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     assert!(p.result.is_some(), "{:?}", p.error);
-    assert_eq!(prompted(&approver, PLAN).len(), 1, "the grant covered the second plan");
+    assert_eq!(
+        prompted(&approver, PLAN).len(),
+        1,
+        "the grant covered the second plan"
+    );
 }
 
 /// One live plan per owner and pool; discarding frees the slot.
@@ -2826,7 +3688,10 @@ async fn one_live_plan_per_owner_and_discard_frees_it() {
     let token = pair(&state, "app").await;
     enrol(&state, &token, "").await;
     let params = json!({ "owner_address": OWNER, "register": true });
-    let first = call(&state, Some(&token), PLAN, params.clone()).await.result.unwrap();
+    let first = call(&state, Some(&token), PLAN, params.clone())
+        .await
+        .result
+        .unwrap();
     let second = call(&state, Some(&token), PLAN, params.clone()).await;
     assert_eq!(err_code(&second), -32006);
     assert_eq!(reason(&second).as_deref(), Some("PLAN_LIMIT"));
@@ -2836,7 +3701,13 @@ async fn one_live_plan_per_owner_and_discard_frees_it() {
     assert_eq!(prompted(&approver, PLAN).len(), 1);
 
     let id = json!({ "plan_id": first["plan_id"] });
-    let d = call(&state, Some(&token), "companion_strk20DiscardPlan", id.clone()).await;
+    let d = call(
+        &state,
+        Some(&token),
+        "companion_strk20DiscardPlan",
+        id.clone(),
+    )
+    .await;
     assert_eq!(d.result, Some(json!(true)));
     let again = call(&state, Some(&token), "companion_strk20DiscardPlan", id).await;
     assert_eq!(err_code(&again), 114);
@@ -2852,16 +3723,35 @@ async fn plans_expire_after_their_ttl() {
     enrol(&state, &token, "").await;
     for bad in [json!(0), json!(86_401), json!("60"), json!(1.5)] {
         let params = json!({ "owner_address": OWNER, "register": true, "ttl_secs": bad });
-        assert_eq!(err_code(&call(&state, Some(&token), PLAN, params).await), 114, "ttl_secs {bad}");
+        assert_eq!(
+            err_code(&call(&state, Some(&token), PLAN, params).await),
+            114,
+            "ttl_secs {bad}"
+        );
     }
     let params = json!({ "owner_address": OWNER, "register": true, "ttl_secs": 1 });
-    let p = call(&state, Some(&token), PLAN, params).await.result.unwrap();
+    let p = call(&state, Some(&token), PLAN, params)
+        .await
+        .result
+        .unwrap();
     assert!(p["expires_at"].as_u64().unwrap() <= wallet_rpc::now_unix_ms() + 1000);
     tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
-    let d = call(&state, Some(&token), "companion_strk20DiscardPlan", json!({ "plan_id": p["plan_id"] })).await;
+    let d = call(
+        &state,
+        Some(&token),
+        "companion_strk20DiscardPlan",
+        json!({ "plan_id": p["plan_id"] }),
+    )
+    .await;
     assert_eq!(reason(&d).as_deref(), Some("PLAN_NOT_FOUND"));
     // The expired plan no longer holds the owner's slot.
-    let again = call(&state, Some(&token), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let again = call(
+        &state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     assert!(again.result.is_some(), "{:?}", again.error);
 }
 
@@ -2873,12 +3763,21 @@ async fn another_client_cannot_discard_a_plan() {
     let (token_b, _, _) = agent_with_account_and_id(&state).await;
     enrol(&state, &token_a, "").await;
     let params = json!({ "owner_address": OWNER, "register": true });
-    let p = call(&state, Some(&token_a), PLAN, params.clone()).await.result.unwrap();
+    let p = call(&state, Some(&token_a), PLAN, params.clone())
+        .await
+        .result
+        .unwrap();
     let id = json!({ "plan_id": p["plan_id"] });
     // B doesn't have the owner in scope, and can't touch A's plan.
     let b_plan = call(&state, Some(&token_b), PLAN, params).await;
     assert_eq!(reason(&b_plan).as_deref(), Some("OWNER_NOT_ENROLLED"));
-    let b = call(&state, Some(&token_b), "companion_strk20DiscardPlan", id.clone()).await;
+    let b = call(
+        &state,
+        Some(&token_b),
+        "companion_strk20DiscardPlan",
+        id.clone(),
+    )
+    .await;
     assert_eq!(err_code(&b), 114);
     assert_eq!(reason(&b).as_deref(), Some("PLAN_NOT_FOUND"));
     let a = call(&state, Some(&token_a), "companion_strk20DiscardPlan", id).await;
@@ -2892,14 +3791,28 @@ async fn locking_the_wallet_wipes_plans() {
     let token = pair(&state, "app").await;
     enrol(&state, &token, "").await;
     let params = json!({ "owner_address": OWNER, "register": true });
-    let p = call(&state, Some(&token), PLAN, params).await.result.unwrap();
+    let p = call(&state, Some(&token), PLAN, params)
+        .await
+        .result
+        .unwrap();
     let id = json!({ "plan_id": p["plan_id"] });
 
     let vault = state.session.lock().await.reseal().unwrap();
     state.session.lock().await.lock();
-    let locked = call(&state, Some(&token), "companion_strk20DiscardPlan", id.clone()).await;
+    let locked = call(
+        &state,
+        Some(&token),
+        "companion_strk20DiscardPlan",
+        id.clone(),
+    )
+    .await;
     assert_eq!(err_code(&locked), -32001);
-    state.session.lock().await.unlock(&vault, "test-pass").unwrap();
+    state
+        .session
+        .lock()
+        .await
+        .unlock(&vault, "test-pass")
+        .unwrap();
     let gone = call(&state, Some(&token), "companion_strk20DiscardPlan", id).await;
     assert_eq!(reason(&gone).as_deref(), Some("PLAN_NOT_FOUND"));
 }
@@ -2917,9 +3830,16 @@ async fn plans_work_for_own_accounts() {
     assert_eq!(p["subject"], json!("account"));
     assert_eq!(p["owner"], json!(account));
     assert_eq!(p["controller"], json!(account));
-    assert_eq!(typed_data_hash(&state, &token, &p).await, felt_of(&p["plan_hash"]));
+    assert_eq!(
+        typed_data_hash(&state, &token, &p).await,
+        felt_of(&p["plan_hash"])
+    );
     let text = &prompted(&approver, PLAN)[0];
-    assert!(text.contains("the companion signs with this account") && text.contains(&account), "prompt lacks the signing account ({} chars)", text.len());
+    assert!(
+        text.contains("the companion signs with this account") && text.contains(&account),
+        "prompt lacks the signing account ({} chars)",
+        text.len()
+    );
     assert!(node.src5_blocks().is_empty());
     assert!(node.methods().iter().all(|m| m != "starknet_getNonce"));
 }
@@ -2931,7 +3851,13 @@ async fn plan_checks_src5_and_registration_for_the_intent() {
     let (state, approver) = plan_state("nosrc5", plan_node(false, Felt::ZERO), &[]);
     let token = pair(&state, "app").await;
     enrol(&state, &token, "").await;
-    let r = call(&state, Some(&token), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let r = call(
+        &state,
+        Some(&token),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32006, "{:?}", r.error);
     assert_eq!(reason(&r).as_deref(), Some("OWNER_NO_CUSTOM_VALIDATION"));
     assert!(r.error.unwrap().message.contains("reference block 988"));
@@ -2950,7 +3876,13 @@ async fn plan_checks_src5_and_registration_for_the_intent() {
     let (state3, approver3) = plan_state("reg", plan_node(true, expected_owner_public_key()), &[]);
     let token3 = pair(&state3, "app").await;
     enrol(&state3, &token3, "").await;
-    let r = call(&state3, Some(&token3), PLAN, json!({ "owner_address": OWNER, "register": true })).await;
+    let r = call(
+        &state3,
+        Some(&token3),
+        PLAN,
+        json!({ "owner_address": OWNER, "register": true }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32006);
     assert_eq!(reason(&r).as_deref(), Some("ALREADY_REGISTERED"));
     assert!(prompted(&approver3, PLAN).is_empty());
@@ -2961,20 +3893,36 @@ async fn plan_validates_its_params() {
     let (state, _) = plan_state("params", plan_node(true, Felt::ZERO), &[]);
     let token = pair(&state, "app").await;
     enrol(&state, &token, "").await;
-    let transfer = json!([{ "type": "transfer", "token": "0x4718", "amount": "0x5", "recipient": "0xb0b" }]);
+    let transfer =
+        json!([{ "type": "transfer", "token": "0x4718", "amount": "0x5", "recipient": "0xb0b" }]);
     for params in [
         json!({ "owner_address": OWNER }),
         json!({ "owner_address": OWNER, "register": true, "actions": transfer }),
         json!({ "owner_address": OWNER, "register": "yes" }),
         json!({ "owner_address": OWNER, "register": true, "reveal_actions": 1 }),
     ] {
-        assert_eq!(err_code(&call(&state, Some(&token), PLAN, params.clone()).await), 114, "{params}");
+        assert_eq!(
+            err_code(&call(&state, Some(&token), PLAN, params.clone()).await),
+            114,
+            "{params}"
+        );
     }
     let deposit = json!({ "owner_address": OWNER, "actions": [{ "type": "deposit", "token": "0x4718", "amount": "0x5" }] });
     let r = call(&state, Some(&token), PLAN, deposit).await;
     assert_eq!(err_code(&r), -32601);
     assert_eq!(reason(&r).as_deref(), Some("DEPOSIT_UNSUPPORTED"));
-    assert_eq!(err_code(&call(&state, Some(&token), "companion_strk20DiscardPlan", json!({})).await), 114);
+    assert_eq!(
+        err_code(
+            &call(
+                &state,
+                Some(&token),
+                "companion_strk20DiscardPlan",
+                json!({})
+            )
+            .await
+        ),
+        114
+    );
 }
 
 // ── STRK20 prove (#48, part 3: the prove step) ──────────────────────────────
@@ -3019,9 +3967,14 @@ impl ProveNode {
 #[async_trait]
 impl StarknetRpc for ProveNode {
     async fn raw(&self, method: &str, params: Value) -> Result<Value, NodeError> {
-        self.calls.lock().unwrap().push((method.to_string(), params.clone()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push((method.to_string(), params.clone()));
         match method {
-            "starknet_blockNumber" => Ok(json!(self.head.load(std::sync::atomic::Ordering::Relaxed))),
+            "starknet_blockNumber" => {
+                Ok(json!(self.head.load(std::sync::atomic::Ordering::Relaxed)))
+            }
             "starknet_getClassHashAt" => Ok(json!("0x1234")),
             "starknet_getNonce" => Ok(json!("0x0")),
             "starknet_call" => {
@@ -3034,7 +3987,10 @@ impl StarknetRpc for ProveNode {
                     };
                     Ok(json!([if yes { "0x1" } else { "0x0" }]))
                 } else if selector == hex_sel("get_public_key") {
-                    Ok(json!([format!("{:#x}", *self.registered_key.lock().unwrap())]))
+                    Ok(json!([format!(
+                        "{:#x}",
+                        *self.registered_key.lock().unwrap()
+                    )]))
                 } else if selector == hex_sel("get_proof_validity_blocks") {
                     Ok(json!([format!("{:#x}", self.validity)]))
                 } else if selector == hex_sel("get_outgoing_channel_info") {
@@ -3053,11 +4009,25 @@ impl StarknetRpc for ProveNode {
         }
         Ok(Felt::from(7u64))
     }
-    async fn estimate_invoke(&self, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_invoke(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         Ok(FeeBounds {
-            l1_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 7 },
-            l2_gas: ResourceBounds { max_amount: 200_000, max_price_per_unit: 11 },
-            l1_data_gas: ResourceBounds { max_amount: 100, max_price_per_unit: 3 },
+            l1_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 7,
+            },
+            l2_gas: ResourceBounds {
+                max_amount: 200_000,
+                max_price_per_unit: 11,
+            },
+            l1_data_gas: ResourceBounds {
+                max_amount: 100,
+                max_price_per_unit: 3,
+            },
         })
     }
     async fn add_invoke(
@@ -3071,7 +4041,12 @@ impl StarknetRpc for ProveNode {
         proof: Option<&str>,
     ) -> Result<Felt, NodeError> {
         self.bounds.lock().unwrap().push(*bounds);
-        self.added.lock().unwrap().push((*sender, calldata.to_vec(), signature.to_vec(), proof.map(str::to_string)));
+        self.added.lock().unwrap().push((
+            *sender,
+            calldata.to_vec(),
+            signature.to_vec(),
+            proof.map(str::to_string),
+        ));
         Ok(Felt::from_hex("0xabc").unwrap())
     }
     async fn is_deployed(&self, _: &Felt) -> Result<bool, NodeError> {
@@ -3080,16 +4055,43 @@ impl StarknetRpc for ProveNode {
     async fn balance_of(&self, _: &Felt, _: &Felt) -> Result<u128, NodeError> {
         Ok(*self.balance.lock().unwrap())
     }
-    async fn estimate_deploy_account(&self, _: &Felt, _: &Felt, _: &[Felt], _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_deploy_account(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_deploy_account(&self, _: &Felt, _: &[Felt], _: &Felt, _: &[Felt], _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_deploy_account(
+        &self,
+        _: &Felt,
+        _: &[Felt],
+        _: &Felt,
+        _: &[Felt],
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
-    async fn estimate_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &Felt) -> Result<FeeBounds, NodeError> {
+    async fn estimate_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &Felt,
+    ) -> Result<FeeBounds, NodeError> {
         unimplemented!()
     }
-    async fn add_declare(&self, _: &Felt, _: &Felt, _: &Value, _: &[Felt], _: &Felt, _: &FeeBounds) -> Result<Felt, NodeError> {
+    async fn add_declare(
+        &self,
+        _: &Felt,
+        _: &Felt,
+        _: &Value,
+        _: &[Felt],
+        _: &Felt,
+        _: &FeeBounds,
+    ) -> Result<Felt, NodeError> {
         unimplemented!()
     }
 }
@@ -3127,7 +4129,10 @@ struct RecordingProver {
 #[async_trait]
 impl prover::Prover for RecordingProver {
     async fn prove(&self, req: prover::ProveRequest) -> Result<prover::ProveResult, String> {
-        let sk = req.payload["transaction"]["calldata"][5].as_str().unwrap_or_default().to_string();
+        let sk = req.payload["transaction"]["calldata"][5]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
         self.payloads.lock().unwrap().push(req.payload);
         if let Some(e) = self.fail_with.lock().unwrap().clone() {
             return Err(e.replace("{sk}", &sk));
@@ -3158,7 +4163,10 @@ struct ProveFixture {
 }
 
 fn prove_fixture(tag: &str, node: Arc<ProveNode>, reject: &'static [&'static str]) -> ProveFixture {
-    let dir = std::env::temp_dir().join(format!("bramble-companion-rpc-prove48-{tag}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "bramble-companion-rpc-prove48-{tag}-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let prover = Arc::new(RecordingProver {
         kind: std::sync::Mutex::new("stub"),
@@ -3171,13 +4179,22 @@ fn prove_fixture(tag: &str, node: Arc<ProveNode>, reject: &'static [&'static str
         settings: Arc::new(prover::SettingsStore::load(dir.join("settings.json"))),
         storage: Arc::new(prover::Storage::new(dir.join("storage"))),
     });
-    let approver = Arc::new(RecordingApprover { reject, prompts: Default::default() });
+    let approver = Arc::new(RecordingApprover {
+        reject,
+        prompts: Default::default(),
+    });
     let state = Arc::new(
         ServerState::new(Arc::new(Mutex::new(make_session(false))), approver.clone())
             .with_node(ChainId::Sepolia, node.clone())
             .with_prover(pstate),
     );
-    ProveFixture { state, approver, node, prover, storage_dir: dir.join("storage") }
+    ProveFixture {
+        state,
+        approver,
+        node,
+        prover,
+        storage_dir: dir.join("storage"),
+    }
 }
 
 /// Plan `register: true` for the owner (enrolled first) or, with `None`, for
@@ -3190,13 +4207,22 @@ async fn register_plan(f: &ProveFixture, token: &str, owner: bool) -> String {
         json!({ "register": true })
     };
     let p = call(&f.state, Some(token), PLAN, params).await;
-    p.result.unwrap_or_else(|| panic!("plan: {:?}", p.error))["plan_id"].as_str().unwrap().to_string()
+    p.result.unwrap_or_else(|| panic!("plan: {:?}", p.error))["plan_id"]
+        .as_str()
+        .unwrap()
+        .to_string()
 }
 
 /// Poll a job until it is terminal.
 async fn poll_job(state: &ServerState, token: &str, job_id: &str) -> Value {
     for _ in 0..500 {
-        let r = call(state, Some(token), "companion_proveStatus", json!({ "job_id": job_id })).await;
+        let r = call(
+            state,
+            Some(token),
+            "companion_proveStatus",
+            json!({ "job_id": job_id }),
+        )
+        .await;
         let job = r.result.unwrap_or_else(|| panic!("status: {:?}", r.error));
         if job["status"] == json!("succeeded") || job["status"] == json!("failed") {
             return job;
@@ -3221,7 +4247,13 @@ async fn owner_prove_passes_the_signature_through_verbatim() {
     let other = pair(&f.state, "agent").await;
 
     let sig = json!(["0xa", "0xb0b", "0x0"]);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": sig })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": sig }),
+    )
+    .await;
     let r = r.result.unwrap_or_else(|| panic!("{:?}", r.error));
     assert_eq!(r["status"], json!("queued"));
     assert_eq!(r["block_number"], json!(988));
@@ -3230,7 +4262,13 @@ async fn owner_prove_passes_the_signature_through_verbatim() {
     let job_id = r["job_id"].as_str().unwrap().to_string();
 
     // Another client can't see the job.
-    let peek = call(&f.state, Some(&other), "companion_proveStatus", json!({ "job_id": job_id })).await;
+    let peek = call(
+        &f.state,
+        Some(&other),
+        "companion_proveStatus",
+        json!({ "job_id": job_id }),
+    )
+    .await;
     assert_eq!(err_code(&peek), 114);
 
     let job = poll_job(&f.state, &token, &job_id).await;
@@ -3239,15 +4277,25 @@ async fn owner_prove_passes_the_signature_through_verbatim() {
     assert_eq!(res["call"]["entry_point"], json!("apply_actions"));
     assert_eq!(felt_of(&res["call"]["contract_address"]), sepolia_pool());
     // The pool message minus its class hash, then Option::None (no screening).
-    assert_eq!(hexes(&res["call"]["calldata"]), vec![Felt::ONE, Felt::from(7u64), Felt::ONE]);
+    assert_eq!(
+        hexes(&res["call"]["calldata"]),
+        vec![Felt::ONE, Felt::from(7u64), Felt::ONE]
+    );
     assert_eq!(res["proof"]["data"], json!("AAAA"));
-    assert_eq!(hexes(&res["proof"]["proof_facts"]), vec![Felt::ONE, Felt::TWO]);
+    assert_eq!(
+        hexes(&res["proof"]["proof_facts"]),
+        vec![Felt::ONE, Felt::TWO]
+    );
 
     // What the prover got: the caller's felts as the signature, nothing else.
     let payloads = f.prover.payloads.lock().unwrap().clone();
     assert_eq!(payloads.len(), 1);
     let tx = &payloads[0]["transaction"];
-    assert_eq!(hexes(&tx["signature"]), hexes(&sig), "the signature must pass through verbatim");
+    assert_eq!(
+        hexes(&tx["signature"]),
+        hexes(&sig),
+        "the signature must pass through verbatim"
+    );
     assert_eq!(payloads[0]["block_number"], json!(988));
     assert_eq!(felt_of(&tx["sender_address"]), sepolia_pool());
     // calldata = [1, pool, compile_actions, len, owner, user_sk, ...actions]
@@ -3262,14 +4310,30 @@ async fn owner_prove_passes_the_signature_through_verbatim() {
         .filter(|(m, _)| m == "starknet_getNonce")
         .map(|(_, p)| p.clone())
         .collect();
-    assert_eq!(nonce_reads, vec![json!({ "block_id": { "block_number": 988 }, "contract_address": format!("{:#x}", sepolia_pool()) })]);
+    assert_eq!(
+        nonce_reads,
+        vec![
+            json!({ "block_id": { "block_number": 988 }, "contract_address": format!("{:#x}", sepolia_pool()) })
+        ]
+    );
 
     // No prompt: same prover kind, unsubmitted, as the plan prompt said.
     assert!(prompted(&f.approver, PROVE).is_empty());
     // Nothing reached proof storage.
-    assert_eq!(std::fs::read_dir(&f.storage_dir).map(|d| d.count()).unwrap_or(0), 0);
+    assert_eq!(
+        std::fs::read_dir(&f.storage_dir)
+            .map(|d| d.count())
+            .unwrap_or(0),
+        0
+    );
     // The plan is consumed.
-    let again = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let again = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(err_code(&again), 114);
     assert_eq!(reason(&again).as_deref(), Some("PLAN_NOT_FOUND"));
 }
@@ -3281,8 +4345,17 @@ async fn owner_prove_with_an_empty_signature_signs_nothing() {
     let f = prove_fixture("owner-empty", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
-    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"].as_str().unwrap().to_string();
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
+    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
     poll_job(&f.state, &token, &job_id).await;
     let payloads = f.prover.payloads.lock().unwrap().clone();
     assert_eq!(payloads[0]["transaction"]["signature"], json!([]));
@@ -3303,7 +4376,10 @@ async fn account_prove_signs_with_the_account_key() {
 
     let payloads = f.prover.payloads.lock().unwrap().clone();
     let tx = &payloads[0]["transaction"];
-    assert_eq!(felt_of(&tx["calldata"][4]), Felt::from_hex(&account).unwrap());
+    assert_eq!(
+        felt_of(&tx["calldata"][4]),
+        Felt::from_hex(&account).unwrap()
+    );
     // Rebuild the invocation hash and check the signature under the account key.
     let invocation = strk20::invocation::ProofInvocation {
         pool: sepolia_pool(),
@@ -3328,16 +4404,34 @@ async fn signature_rules_per_subject() {
     assert_eq!(err_code(&r), 114);
     assert_eq!(reason(&r).as_deref(), Some("SIGNATURE_REQUIRED"));
     for bad in [json!("0x1"), json!(["nope"]), json!([1])] {
-        let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": bad })).await;
+        let r = call(
+            &f.state,
+            Some(&token),
+            PROVE,
+            json!({ "plan_id": plan_id, "signature": bad }),
+        )
+        .await;
         assert_eq!(err_code(&r), 114, "{bad}");
     }
-    let ok = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x1"] })).await;
+    let ok = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x1"] }),
+    )
+    .await;
     assert!(ok.result.is_some(), "the plan stayed live: {:?}", ok.error);
 
     let g = prove_fixture("sig-account", prove_node(), &[]);
     let token = pair(&g.state, "app").await;
     let plan_id = register_plan(&g, &token, false).await;
-    let r = call(&g.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x1", "0x2"] })).await;
+    let r = call(
+        &g.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x1", "0x2"] }),
+    )
+    .await;
     assert_eq!(err_code(&r), 114);
     assert_eq!(reason(&r).as_deref(), Some("SIGNATURE_NOT_ALLOWED"));
     assert!(g.prover.payloads.lock().unwrap().is_empty());
@@ -3352,11 +4446,23 @@ async fn a_stale_plan_is_refused_and_dropped() {
     let plan_id = register_plan(&f, &token, true).await;
     // Someone registered the owner in the meantime.
     *f.node.registered_key.lock().unwrap() = Felt::from(0x1234u64);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32006, "{:?}", r.error);
     assert_eq!(reason(&r).as_deref(), Some("PLAN_STALE"));
     assert!(f.prover.payloads.lock().unwrap().is_empty());
-    let again = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let again = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(reason(&again).as_deref(), Some("PLAN_NOT_FOUND"));
 }
 
@@ -3374,7 +4480,10 @@ async fn reference_block_bounds_are_checked() {
     assert!(r.error.unwrap().message.contains("Retry in 2 block"));
     let r = call(&f.state, Some(&token), PROVE, prove_at(json!(950))).await;
     assert_eq!(reason(&r).as_deref(), Some("BLOCK_BEFORE_PLAN"));
-    assert_eq!(err_code(&call(&f.state, Some(&token), PROVE, prove_at(json!("988"))).await), 114);
+    assert_eq!(
+        err_code(&call(&f.state, Some(&token), PROVE, prove_at(json!("988"))).await),
+        114
+    );
 
     // The head moves on: 988 is now too old for the 450-block window (with
     // 120 kept in hand), the default B is fine.
@@ -3382,8 +4491,17 @@ async fn reference_block_bounds_are_checked() {
     let r = call(&f.state, Some(&token), PROVE, prove_at(json!(988))).await;
     assert_eq!(reason(&r).as_deref(), Some("BLOCK_TOO_OLD"));
     assert!(f.prover.payloads.lock().unwrap().is_empty());
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
-    assert_eq!(r.result.unwrap_or_else(|| panic!("{:?}", r.error))["block_number"], json!(1388));
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
+    assert_eq!(
+        r.result.unwrap_or_else(|| panic!("{:?}", r.error))["block_number"],
+        json!(1388)
+    );
 }
 
 /// The owner dropped SRC5 after the plan (say, an upgrade): refused at B.
@@ -3393,12 +4511,24 @@ async fn src5_is_rechecked_at_the_reference_block() {
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
     f.node.set_head(1100);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32006);
     assert_eq!(reason(&r).as_deref(), Some("OWNER_NO_CUSTOM_VALIDATION"));
     assert!(r.error.unwrap().message.contains("reference block 1088"));
     // An explicit B inside the SRC5 range passes.
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "block_number": 990 })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "block_number": 990 }),
+    )
+    .await;
     assert!(r.result.is_some(), "{:?}", r.error);
 }
 
@@ -3408,9 +4538,21 @@ async fn an_owner_removed_after_planning_cannot_be_proved() {
     let f = prove_fixture("removed", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let rm = call(&f.state, Some(&token), "companion_strk20RemoveOwner", json!({ "owner_address": OWNER })).await;
+    let rm = call(
+        &f.state,
+        Some(&token),
+        "companion_strk20RemoveOwner",
+        json!({ "owner_address": OWNER }),
+    )
+    .await;
     assert_eq!(rm.result, Some(json!(true)), "{:?}", rm.error);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32002);
     assert_eq!(reason(&r).as_deref(), Some("OWNER_NOT_ENROLLED"));
     assert!(f.prover.payloads.lock().unwrap().is_empty());
@@ -3423,7 +4565,13 @@ async fn another_client_cannot_prove_a_plan() {
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
     let other = pair(&f.state, "agent").await;
-    let r = call(&f.state, Some(&other), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&other),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert_eq!(reason(&r).as_deref(), Some("PLAN_NOT_FOUND"));
 }
 
@@ -3434,7 +4582,13 @@ async fn locking_wipes_prove_results() {
     let f = prove_fixture("lock", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     let job_id = r.result.unwrap()["job_id"].as_str().unwrap().to_string();
     let job = poll_job(&f.state, &token, &job_id).await;
     assert!(job["result"]["proof"].is_object());
@@ -3444,7 +4598,12 @@ async fn locking_wipes_prove_results() {
 
     let vault = f.state.session.lock().await.reseal().unwrap();
     f.state.session.lock().await.lock();
-    f.state.session.lock().await.unlock(&vault, "test-pass").unwrap();
+    f.state
+        .session
+        .lock()
+        .await
+        .unlock(&vault, "test-pass")
+        .unwrap();
     let job = poll_job(&f.state, &token, &job_id).await;
     assert_eq!(job["status"], json!("succeeded"));
     assert!(job.get("result").is_none(), "{job}");
@@ -3461,27 +4620,51 @@ async fn submit_account_prompts_and_submits_from_the_controller() {
     let plan_id = register_plan(&f, &token, true).await;
 
     // Validation first.
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submit": "relay" })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "submit": "relay" }),
+    )
+    .await;
     assert_eq!(err_code(&r), -32601);
     assert_eq!(reason(&r).as_deref(), Some("RELAY_UNSUPPORTED"));
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submitter_address": controller })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "submitter_address": controller }),
+    )
+    .await;
     assert_eq!(err_code(&r), 114);
     let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submit": "account", "submitter_address": "0xdead" })).await;
     assert_eq!(err_code(&r), -32002);
 
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" }),
+    )
+    .await;
     let r = r.result.unwrap_or_else(|| panic!("{:?}", r.error));
     assert_eq!(r["submit"], json!("account"));
     assert_eq!(r["submitter_address"], json!(controller));
     let prompts = prompted(&f.approver, PROVE);
     assert_eq!(prompts.len(), 1);
-    for (i, want) in [&controller, OWNER, "links", "publicly", "pool's fee"].iter().enumerate() {
+    for (i, want) in [&controller, OWNER, "links", "publicly", "pool's fee"]
+        .iter()
+        .enumerate()
+    {
         assert!(prompts[0].contains(want), "prompt lacks expected item #{i}");
     }
 
     let job = poll_job(&f.state, &token, r["job_id"].as_str().unwrap()).await;
     assert_eq!(job["status"], json!("succeeded"), "{job}");
-    assert_eq!(felt_of(&job["result"]["transaction_hash"]), Felt::from_hex("0xabc").unwrap());
+    assert_eq!(
+        felt_of(&job["result"]["transaction_hash"]),
+        Felt::from_hex("0xabc").unwrap()
+    );
     assert_eq!(job["result"]["submitter_address"], json!(controller));
     let added = f.node.added.lock().unwrap().clone();
     assert_eq!(added.len(), 1);
@@ -3491,11 +4674,17 @@ async fn submit_account_prompts_and_submits_from_the_controller() {
     // One call (the pool fee is zero, so no approve): apply_actions on the pool.
     assert_eq!(calldata[0], Felt::ONE);
     assert_eq!(calldata[1], sepolia_pool());
-    assert_eq!(calldata[2], wallet_core::get_selector_from_name("apply_actions"));
+    assert_eq!(
+        calldata[2],
+        wallet_core::get_selector_from_name("apply_actions")
+    );
     // The controller signed its own (outer) submission, not the virtual tx.
     assert_eq!(signature.len(), 2);
     let payloads = f.prover.payloads.lock().unwrap().clone();
-    assert_eq!(hexes(&payloads[0]["transaction"]["signature"]), vec![Felt::from(5u64)]);
+    assert_eq!(
+        hexes(&payloads[0]["transaction"]["signature"]),
+        vec![Felt::from(5u64)]
+    );
 }
 
 /// #61: a `submit: "account"` batch fits its bounds to the submitter's
@@ -3507,8 +4696,19 @@ async fn submit_account_fits_the_bounds_to_the_submitters_balance() {
     *f.node.balance.lock().unwrap() = 2_000_000;
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" })).await;
-    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" }),
+    )
+    .await;
+    let job = poll_job(
+        &f.state,
+        &token,
+        r.result.unwrap()["job_id"].as_str().unwrap(),
+    )
+    .await;
     assert_eq!(job["status"], json!("succeeded"));
     let bounds = f.node.bounds.lock().unwrap().clone();
     assert_eq!(bounds.len(), 1);
@@ -3522,10 +4722,24 @@ async fn submit_account_fits_the_bounds_to_the_submitters_balance() {
     *f.node.balance.lock().unwrap() = 1_000;
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" })).await;
-    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x5"], "submit": "account" }),
+    )
+    .await;
+    let job = poll_job(
+        &f.state,
+        &token,
+        r.result.unwrap()["job_id"].as_str().unwrap(),
+    )
+    .await;
     assert_eq!(job["status"], json!("failed"));
-    assert_eq!(job["error_reason"], json!("INSUFFICIENT_BALANCE_FOR_BOUNDS"));
+    assert_eq!(
+        job["error_reason"],
+        json!("INSUFFICIENT_BALANCE_FOR_BOUNDS")
+    );
     assert!(f.node.added.lock().unwrap().is_empty());
 }
 
@@ -3535,10 +4749,22 @@ async fn refusing_the_prove_prompt_keeps_the_plan() {
     let f = prove_fixture("refuse", prove_node(), &[PROVE]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submit": "account" })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "submit": "account" }),
+    )
+    .await;
     assert_eq!(err_code(&r), 113);
     assert!(f.prover.payloads.lock().unwrap().is_empty());
-    let d = call(&f.state, Some(&token), "companion_strk20DiscardPlan", json!({ "plan_id": plan_id })).await;
+    let d = call(
+        &f.state,
+        Some(&token),
+        "companion_strk20DiscardPlan",
+        json!({ "plan_id": plan_id }),
+    )
+    .await;
     assert_eq!(d.result, Some(json!(true)));
 }
 
@@ -3549,11 +4775,21 @@ async fn a_prover_change_since_the_plan_prompts() {
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
     *f.prover.kind.lock().unwrap() = "remote";
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert!(r.result.is_some(), "{:?}", r.error);
     let prompts = prompted(&f.approver, PROVE);
     assert_eq!(prompts.len(), 1);
-    assert!(prompts[0].contains("then: stub, now: remote") && prompts[0].contains("viewing key"), "{}", prompts[0]);
+    assert!(
+        prompts[0].contains("then: stub, now: remote") && prompts[0].contains("viewing key"),
+        "{}",
+        prompts[0]
+    );
 }
 
 /// The pool rejecting the owner's signature fails the job with
@@ -3568,13 +4804,30 @@ async fn a_rejected_owner_signature_fails_the_job_with_a_reason() {
          0x494e56414c49445f5349474e4154555245 ('INVALID_SIGNATURE')"
             .into(),
     );
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x1"] })).await;
-    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x1"] }),
+    )
+    .await;
+    let job = poll_job(
+        &f.state,
+        &token,
+        r.result.unwrap()["job_id"].as_str().unwrap(),
+    )
+    .await;
     assert_eq!(job["status"], json!("failed"));
     assert_eq!(job["error_reason"], json!("OWNER_SIGNATURE_REJECTED"));
     let err = job["error"].as_str().unwrap();
-    assert!(err.starts_with("OWNER_SIGNATURE_REJECTED: ") && err.contains("reference block 988"), "{err}");
-    let sk = f.prover.payloads.lock().unwrap()[0]["transaction"]["calldata"][5].as_str().unwrap().to_string();
+    assert!(
+        err.starts_with("OWNER_SIGNATURE_REJECTED: ") && err.contains("reference block 988"),
+        "{err}"
+    );
+    let sk = f.prover.payloads.lock().unwrap()[0]["transaction"]["calldata"][5]
+        .as_str()
+        .unwrap()
+        .to_string();
     assert!(!err.contains(&sk) && !err.contains("calldata"), "{err}");
 }
 
@@ -3593,34 +4846,72 @@ async fn revert_text_from_an_owner_contract_never_reaches_the_caller_or_the_log(
          revert reason: Error in the called contract (owner): ('LEAK:{sk}:ENCODED')"
             .into(),
     );
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": ["0x1"] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": ["0x1"] }),
+    )
+    .await;
     let job_id = r.result.unwrap()["job_id"].as_str().unwrap().to_string();
     let job = poll_job(&f.state, &token, &job_id).await;
     assert_eq!(job["status"], json!("failed"));
     assert_eq!(job["error_reason"], json!("PROVING_FAILED"));
-    let sk = f.prover.payloads.lock().unwrap()[0]["transaction"]["calldata"][5].as_str().unwrap().to_string();
+    let sk = f.prover.payloads.lock().unwrap()[0]["transaction"]["calldata"][5]
+        .as_str()
+        .unwrap()
+        .to_string();
     let reversed: String = sk.trim_start_matches("0x").chars().rev().collect();
     let job_text = job.to_string();
     for needle in ["LEAK", "ENCODED", "owner)", sk.as_str(), reversed.as_str()] {
-        assert!(!job_text.contains(needle), "proveStatus leaks {needle:?}: {job_text}");
+        assert!(
+            !job_text.contains(needle),
+            "proveStatus leaks {needle:?}: {job_text}"
+        );
     }
     assert!(job["error"].as_str().unwrap().contains("reverted"), "{job}");
 
     // The request log: the proveStatus entries keep status and reason, not the
     // error or result; nothing anywhere holds the revert text.
     let log = f.state.log.lock().await.recent(200);
-    let status: Vec<_> = log.iter().filter(|e| e.method == "companion_proveStatus").collect();
+    let status: Vec<_> = log
+        .iter()
+        .filter(|e| e.method == "companion_proveStatus")
+        .collect();
     assert!(!status.is_empty());
     for e in &status {
         let logged = e.result_json.as_deref().unwrap_or_default();
-        assert!(logged.contains("<redacted>") || !logged.contains("\"error\""), "{logged}");
+        assert!(
+            logged.contains("<redacted>") || !logged.contains("\"error\""),
+            "{logged}"
+        );
     }
-    let last = status.iter().find(|e| e.result_json.as_deref().is_some_and(|j| j.contains("failed"))).expect("failed status logged");
-    assert!(last.result_json.as_deref().unwrap().contains("PROVING_FAILED"));
+    let last = status
+        .iter()
+        .find(|e| {
+            e.result_json
+                .as_deref()
+                .is_some_and(|j| j.contains("failed"))
+        })
+        .expect("failed status logged");
+    assert!(last
+        .result_json
+        .as_deref()
+        .unwrap()
+        .contains("PROVING_FAILED"));
     for e in &log {
-        let all = format!("{} {} {}", e.outcome, e.params_json.as_deref().unwrap_or(""), e.result_json.as_deref().unwrap_or(""));
+        let all = format!(
+            "{} {} {}",
+            e.outcome,
+            e.params_json.as_deref().unwrap_or(""),
+            e.result_json.as_deref().unwrap_or("")
+        );
         for needle in ["LEAK", "ENCODED", sk.as_str(), reversed.as_str()] {
-            assert!(!all.contains(needle), "log entry {} leaks {needle:?}: {all}", e.method);
+            assert!(
+                !all.contains(needle),
+                "log entry {} leaks {needle:?}: {all}",
+                e.method
+            );
         }
     }
 }
@@ -3631,8 +4922,19 @@ async fn strk20_job_results_are_not_logged() {
     let f = prove_fixture("nolog", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
-    let job = poll_job(&f.state, &token, r.result.unwrap()["job_id"].as_str().unwrap()).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
+    let job = poll_job(
+        &f.state,
+        &token,
+        r.result.unwrap()["job_id"].as_str().unwrap(),
+    )
+    .await;
     assert_eq!(job["status"], json!("succeeded"));
     let log = f.state.log.lock().await.recent(200);
     let done = log
@@ -3641,7 +4943,10 @@ async fn strk20_job_results_are_not_logged() {
         .filter_map(|e| e.result_json.as_deref())
         .find(|j| j.contains("succeeded"))
         .expect("logged");
-    assert!(done.contains("<redacted>") && !done.contains("AAAA") && !done.contains("apply_actions"), "{done}");
+    assert!(
+        done.contains("<redacted>") && !done.contains("AAAA") && !done.contains("apply_actions"),
+        "{done}"
+    );
 }
 
 /// The wallet locks and unlocks again while the job is submitting (between
@@ -3652,20 +4957,44 @@ async fn a_lock_and_quick_unlock_during_submission_stops_it() {
     let f = prove_fixture("lock-submit", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    f.node.hold_nonce.store(true, std::sync::atomic::Ordering::SeqCst);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submit": "account" })).await;
-    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"].as_str().unwrap().to_string();
-    tokio::time::timeout(std::time::Duration::from_secs(5), f.node.nonce_reached.notified()).await.expect("submitting");
+    f.node
+        .hold_nonce
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "submit": "account" }),
+    )
+    .await;
+    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        f.node.nonce_reached.notified(),
+    )
+    .await
+    .expect("submitting");
 
     let vault = f.state.session.lock().await.reseal().unwrap();
     f.state.session.lock().await.lock();
-    f.state.session.lock().await.unlock(&vault, "test-pass").unwrap();
+    f.state
+        .session
+        .lock()
+        .await
+        .unlock(&vault, "test-pass")
+        .unwrap();
     f.node.nonce_release.notify_one();
 
     let job = poll_job(&f.state, &token, &job_id).await;
     assert_eq!(job["status"], json!("failed"), "{job}");
     assert_eq!(job["error_reason"], json!("WIPED_ON_LOCK"), "{job}");
-    assert!(f.node.added.lock().unwrap().is_empty(), "nothing may be broadcast");
+    assert!(
+        f.node.added.lock().unwrap().is_empty(),
+        "nothing may be broadcast"
+    );
 }
 
 /// The submitter left the client's scope while the job was submitting: it
@@ -3676,15 +5005,35 @@ async fn a_submitter_out_of_scope_at_signing_time_does_not_sign() {
     let token = pair(&f.state, "app").await;
     let (_, controller) = user_registry();
     let plan_id = register_plan(&f, &token, true).await;
-    f.node.hold_nonce.store(true, std::sync::atomic::Ordering::SeqCst);
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "submit": "account" })).await;
-    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"].as_str().unwrap().to_string();
-    tokio::time::timeout(std::time::Duration::from_secs(5), f.node.nonce_reached.notified()).await.expect("submitting");
+    f.node
+        .hold_nonce
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "submit": "account" }),
+    )
+    .await;
+    let job_id = r.result.unwrap_or_else(|| panic!("{:?}", r.error))["job_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        f.node.nonce_reached.notified(),
+    )
+    .await
+    .expect("submitting");
     f.state.session.lock().await.rollback_account(&controller);
     f.node.nonce_release.notify_one();
     let job = poll_job(&f.state, &token, &job_id).await;
     assert_eq!(job["status"], json!("failed"), "{job}");
-    assert_eq!(job["error_reason"], json!("SUBMITTER_NOT_IN_SCOPE"), "{job}");
+    assert_eq!(
+        job["error_reason"],
+        json!("SUBMITTER_NOT_IN_SCOPE"),
+        "{job}"
+    );
     assert!(f.node.added.lock().unwrap().is_empty());
 }
 
@@ -3694,8 +5043,19 @@ async fn a_huge_block_number_is_refused_cleanly() {
     let f = prove_fixture("huge-block", prove_node(), &[]);
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [], "block_number": u64::MAX })).await;
-    assert_eq!(reason(&r).as_deref(), Some("BLOCK_TOO_RECENT"), "{:?}", r.error);
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [], "block_number": u64::MAX }),
+    )
+    .await;
+    assert_eq!(
+        reason(&r).as_deref(),
+        Some("BLOCK_TOO_RECENT"),
+        "{:?}",
+        r.error
+    );
 }
 
 /// A remote prover's URL change since the plan prompts again, naming both.
@@ -3709,15 +5069,33 @@ async fn a_remote_prover_url_change_since_the_plan_prompts() {
         s.testnet.prover_url = url.into();
         s
     };
-    settings.update(set_url("https://prover-a.example")).await.unwrap();
+    settings
+        .update(set_url("https://prover-a.example"))
+        .await
+        .unwrap();
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    settings.update(set_url("https://prover-b.example")).await.unwrap();
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    settings
+        .update(set_url("https://prover-b.example"))
+        .await
+        .unwrap();
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert!(r.result.is_some(), "{:?}", r.error);
     let prompts = prompted(&f.approver, PROVE);
     assert_eq!(prompts.len(), 1);
-    assert!(prompts[0].contains("then: remote at https://prover-a.example, now: remote at https://prover-b.example"), "{}", prompts[0]);
+    assert!(
+        prompts[0].contains(
+            "then: remote at https://prover-a.example, now: remote at https://prover-b.example"
+        ),
+        "{}",
+        prompts[0]
+    );
 }
 
 /// The same URL: no prompt.
@@ -3727,7 +5105,13 @@ async fn an_unchanged_remote_prover_does_not_prompt() {
     *f.prover.kind.lock().unwrap() = "remote";
     let token = pair(&f.state, "app").await;
     let plan_id = register_plan(&f, &token, true).await;
-    let r = call(&f.state, Some(&token), PROVE, json!({ "plan_id": plan_id, "signature": [] })).await;
+    let r = call(
+        &f.state,
+        Some(&token),
+        PROVE,
+        json!({ "plan_id": plan_id, "signature": [] }),
+    )
+    .await;
     assert!(r.result.is_some(), "{:?}", r.error);
     assert!(prompted(&f.approver, PROVE).is_empty());
 }
@@ -3738,11 +5122,29 @@ async fn companion_prove_jobs_are_visible_to_their_client_only() {
     let state = state_with_prover("scoped");
     let a = pair(&state, "app").await;
     let b = pair(&state, "agent").await;
-    let r = call(&state, Some(&a), "companion_prove", json!({ "payload": { "x": 1 } })).await;
+    let r = call(
+        &state,
+        Some(&a),
+        "companion_prove",
+        json!({ "payload": { "x": 1 } }),
+    )
+    .await;
     let job_id = r.result.unwrap()["job_id"].as_str().unwrap().to_string();
-    let theirs = call(&state, Some(&b), "companion_proveStatus", json!({ "job_id": job_id })).await;
+    let theirs = call(
+        &state,
+        Some(&b),
+        "companion_proveStatus",
+        json!({ "job_id": job_id }),
+    )
+    .await;
     assert_eq!(err_code(&theirs), 114);
-    let mine = call(&state, Some(&a), "companion_proveStatus", json!({ "job_id": job_id })).await;
+    let mine = call(
+        &state,
+        Some(&a),
+        "companion_proveStatus",
+        json!({ "job_id": job_id }),
+    )
+    .await;
     assert!(mine.result.is_some(), "{:?}", mine.error);
 }
 
@@ -3756,16 +5158,24 @@ async fn one_client_cannot_block_another_clients_plan() {
     let b = pair(&state, "app").await;
     enrol(&state, &a, "").await;
     let params = json!({ "owner_address": OWNER, "register": true, "ttl_secs": 86_400 });
-    let pa = call(&state, Some(&a), PLAN, params.clone()).await.result.unwrap();
+    let pa = call(&state, Some(&a), PLAN, params.clone())
+        .await
+        .result
+        .unwrap();
     let pb = call(&state, Some(&b), PLAN, params.clone()).await;
-    let pb = pb.result.unwrap_or_else(|| panic!("b was blocked: {:?}", pb.error));
+    let pb = pb
+        .result
+        .unwrap_or_else(|| panic!("b was blocked: {:?}", pb.error));
     assert_ne!(pa["plan_id"], pb["plan_id"]);
     // b's own cap still holds, and names only b's plan.
     let again = call(&state, Some(&b), PLAN, params).await;
     assert_eq!(reason(&again).as_deref(), Some("PLAN_LIMIT"));
     let msg = again.error.unwrap().message;
     assert!(msg.contains(pb["plan_id"].as_str().unwrap()), "{msg}");
-    assert!(!msg.contains(pa["plan_id"].as_str().unwrap()) && !msg.contains("another client"), "{msg}");
+    assert!(
+        !msg.contains(pa["plan_id"].as_str().unwrap()) && !msg.contains("another client"),
+        "{msg}"
+    );
 }
 
 /// Owner labels and client names lose control and invisible format (bidi,
@@ -3782,13 +5192,34 @@ async fn owner_labels_and_client_names_are_stripped_of_format_characters() {
     .await;
     let token = resp.result.unwrap()["token"].as_str().unwrap().to_string();
     let label = "va\u{202E}ult\u{200F}\u{2069}\u{E0041}\u{0007}!";
-    let r = call(&state, Some(&token), "companion_strk20AddOwner", json!({ "owner_address": OWNER, "label": label })).await;
+    let r = call(
+        &state,
+        Some(&token),
+        "companion_strk20AddOwner",
+        json!({ "owner_address": OWNER, "label": label }),
+    )
+    .await;
     let r = r.result.unwrap_or_else(|| panic!("{:?}", r.error));
     assert_eq!(r["label"], json!("vault!"));
     let all = approver.prompts.lock().unwrap().clone();
-    let shown: Vec<String> = all.iter().map(|p| format!("{} | {}", p.client_label, p.summary)).collect();
-    for bad in ['\u{202E}', '\u{200B}', '\u{2066}', '\u{FEFF}', '\u{200F}', '\u{2069}', '\u{E0041}', '\u{0007}'] {
-        assert!(!shown.iter().any(|s| s.contains(bad)), "{bad:?} reached a prompt: {shown:?}");
+    let shown: Vec<String> = all
+        .iter()
+        .map(|p| format!("{} | {}", p.client_label, p.summary))
+        .collect();
+    for bad in [
+        '\u{202E}',
+        '\u{200B}',
+        '\u{2066}',
+        '\u{FEFF}',
+        '\u{200F}',
+        '\u{2069}',
+        '\u{E0041}',
+        '\u{0007}',
+    ] {
+        assert!(
+            !shown.iter().any(|s| s.contains(bad)),
+            "{bad:?} reached a prompt: {shown:?}"
+        );
     }
     assert!(shown.iter().any(|s| s.contains("goodlimex")), "{shown:?}");
     let add = prompted(&approver, "companion_strk20AddOwner");
@@ -3803,10 +5234,25 @@ async fn proof_activity_is_scoped_to_the_client() {
     let state = state_with_prover("activity-scope");
     let a = pair(&state, "app").await;
     let b = pair(&state, "agent").await;
-    call(&state, Some(&a), "companion_prove", json!({ "payload": { "x": 1 }, "label": "mine" })).await;
-    let act_b = call(&state, Some(&b), "companion_proofActivity", json!({})).await.result.unwrap();
+    call(
+        &state,
+        Some(&a),
+        "companion_prove",
+        json!({ "payload": { "x": 1 }, "label": "mine" }),
+    )
+    .await;
+    let act_b = call(&state, Some(&b), "companion_proofActivity", json!({}))
+        .await
+        .result
+        .unwrap();
     assert_eq!(act_b["activity"], json!([]), "{act_b}");
-    let act_a = call(&state, Some(&a), "companion_proofActivity", json!({})).await.result.unwrap();
+    let act_a = call(&state, Some(&a), "companion_proofActivity", json!({}))
+        .await
+        .result
+        .unwrap();
     let list = act_a["activity"].as_array().unwrap();
-    assert!(!list.is_empty() && list.iter().all(|x| x["label"] == json!("mine")), "{act_a}");
+    assert!(
+        !list.is_empty() && list.iter().all(|x| x["label"] == json!("mine")),
+        "{act_a}"
+    );
 }

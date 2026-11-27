@@ -35,7 +35,7 @@ use serde_json::Value;
 
 pub use config::ProverConfig;
 pub use jobs::{Activity, Job, JobFailure, JobOptions, JobStatus, Jobs};
-pub use prover::{Prover, ProveRequest, ProveResult, RemoteProver};
+pub use prover::{ProveRequest, ProveResult, Prover, RemoteProver};
 pub use settings::{NetworkConfig, Settings, SettingsStore, Strk20Config};
 pub use state::ProverState;
 pub use storage::{ProofRecord, ProofSummary, Storage, StorageStats};
@@ -56,7 +56,11 @@ pub fn build_prover_state(data_dir: PathBuf, cfg: &ProverConfig) -> ProverState 
     let next_seq = storage.max_seq().map_or(0, |m| m + 1);
     let backend = {
         let s = settings.prover_backend_blocking();
-        if s.is_empty() { cfg.prover_backend.clone() } else { s }
+        if s.is_empty() {
+            cfg.prover_backend.clone()
+        } else {
+            s
+        }
     };
     let prover: Arc<dyn Prover> = match backend.as_str() {
         // "remote" / "companion" → forward to the user's configured remote prover.
@@ -64,11 +68,19 @@ pub fn build_prover_state(data_dir: PathBuf, cfg: &ProverConfig) -> ProverState 
         // Default (incl. "native"): prove on-device.
         _ => Arc::new(native_prover::NativeProver::new(settings.clone())),
     };
-    ProverState { prover, jobs: Arc::new(Jobs::new(next_seq)), settings, storage }
+    ProverState {
+        prover,
+        jobs: Arc::new(Jobs::new(next_seq)),
+        settings,
+        storage,
+    }
 }
 
 fn unix_ms() -> u128 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 /// Enqueue a payload and prove it in the background. Times the proof, persists a
@@ -94,7 +106,16 @@ pub async fn enqueue_prove_as(
     network: String,
     client_id: Option<String>,
 ) -> String {
-    let job_id = state.jobs.create_with(label.clone(), JobOptions { client_id, result_ttl_ms: None }).await;
+    let job_id = state
+        .jobs
+        .create_with(
+            label.clone(),
+            JobOptions {
+                client_id,
+                result_ttl_ms: None,
+            },
+        )
+        .await;
     let st = state.clone();
     let jid = job_id.clone();
     tokio::spawn(async move {
@@ -103,7 +124,12 @@ pub async fn enqueue_prove_as(
         let started = std::time::Instant::now();
         let res = st
             .prover
-            .prove(ProveRequest { payload: payload.clone(), label: label.clone(), network: network.clone(), allow_empty_signature: false })
+            .prove(ProveRequest {
+                payload: payload.clone(),
+                label: label.clone(),
+                network: network.clone(),
+                allow_empty_signature: false,
+            })
             .await;
         let prove_ms = started.elapsed().as_millis();
 
@@ -149,10 +175,24 @@ pub async fn prove_unrecorded(
 ) -> Result<Value, String> {
     // Untagged (no client can poll it) and ephemeral: the caller already gets
     // the proof as this function's return value.
-    let opts = JobOptions { client_id: None, result_ttl_ms: Some(UNRECORDED_RESULT_TTL_MS) };
+    let opts = JobOptions {
+        client_id: None,
+        result_ttl_ms: Some(UNRECORDED_RESULT_TTL_MS),
+    };
     let job_id = state.jobs.create_with(label.clone(), opts).await;
     state.jobs.set_status(&job_id, JobStatus::Proving).await;
-    let Some(res) = prove_or_cancel(state, &job_id, ProveRequest { payload, label, network, allow_empty_signature: true }).await else {
+    let Some(res) = prove_or_cancel(
+        state,
+        &job_id,
+        ProveRequest {
+            payload,
+            label,
+            network,
+            allow_empty_signature: true,
+        },
+    )
+    .await
+    else {
         state.jobs.fail_with(&job_id, wiped_failure()).await;
         return Err(WIPED_MESSAGE.into());
     };
@@ -168,7 +208,10 @@ pub async fn prove_unrecorded(
 pub const WIPED_MESSAGE: &str = "the wallet locked while this job ran, so proving was stopped";
 
 fn wiped_failure() -> JobFailure {
-    JobFailure { reason: Some("WIPED_ON_LOCK".into()), message: format!("WIPED_ON_LOCK: {WIPED_MESSAGE}") }
+    JobFailure {
+        reason: Some("WIPED_ON_LOCK".into()),
+        message: format!("WIPED_ON_LOCK: {WIPED_MESSAGE}"),
+    }
 }
 
 /// Run the prover, unless the job's cancel signal fires first (the wallet
@@ -224,13 +267,27 @@ where
     F: FnOnce(String, Result<Value, String>) -> Fut + Send + 'static,
     Fut: std::future::Future<Output = Result<Value, JobFailure>> + Send + 'static,
 {
-    let opts = JobOptions { client_id, result_ttl_ms: Some(UNRECORDED_RESULT_TTL_MS) };
+    let opts = JobOptions {
+        client_id,
+        result_ttl_ms: Some(UNRECORDED_RESULT_TTL_MS),
+    };
     let job_id = state.jobs.create_with(label.clone(), opts).await;
     let st = state.clone();
     let jid = job_id.clone();
     tokio::spawn(async move {
         st.jobs.set_status(&jid, JobStatus::Proving).await;
-        let Some(res) = prove_or_cancel(&st, &jid, ProveRequest { payload, label, network, allow_empty_signature: true }).await else {
+        let Some(res) = prove_or_cancel(
+            &st,
+            &jid,
+            ProveRequest {
+                payload,
+                label,
+                network,
+                allow_empty_signature: true,
+            },
+        )
+        .await
+        else {
             drop(finish);
             st.jobs.fail_with(&jid, wiped_failure()).await;
             return;

@@ -32,7 +32,11 @@ fn pick_data_dir(base: &std::path::Path, current: &str, legacy: &[&str]) -> Path
     if current.exists() {
         return current;
     }
-    legacy.iter().map(|id| base.join(id)).find(|d| d.exists()).unwrap_or(current)
+    legacy
+        .iter()
+        .map(|id| base.join(id))
+        .find(|d| d.exists())
+        .unwrap_or(current)
 }
 
 /// Read the bound port from `port.lock` and build the loopback service URL.
@@ -67,7 +71,8 @@ mod tests {
     #[test]
     fn app_identifier_matches_the_desktop_bundle() {
         let conf: Value =
-            serde_json::from_str(include_str!("../../../desktop/src-tauri/tauri.conf.json")).unwrap();
+            serde_json::from_str(include_str!("../../../desktop/src-tauri/tauri.conf.json"))
+                .unwrap();
         assert_eq!(conf["identifier"], APP_IDENTIFIER);
     }
 

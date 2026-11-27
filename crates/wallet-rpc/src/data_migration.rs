@@ -103,8 +103,7 @@ mod tests {
 
     /// A fresh base dir holding `legacy/` (with a vault) and no `current/`.
     fn setup(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
-        let base = std::env::temp_dir()
-            .join(format!("data-migrate-{tag}-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("data-migrate-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         let legacy = base.join("org.example.old");
         std::fs::create_dir_all(legacy.join("prover/storage")).unwrap();
@@ -124,8 +123,14 @@ mod tests {
             Migration::Migrated { files: 4 }
         );
         assert_eq!(std::fs::read(current.join("vault.bin")).unwrap(), b"vault");
-        assert_eq!(std::fs::read(current.join("port.lock")).unwrap(), br#"{"port":4242}"#);
-        assert_eq!(std::fs::read(current.join("prover/storage/proof-1")).unwrap(), b"proof");
+        assert_eq!(
+            std::fs::read(current.join("port.lock")).unwrap(),
+            br#"{"port":4242}"#
+        );
+        assert_eq!(
+            std::fs::read(current.join("prover/storage/proof-1")).unwrap(),
+            b"proof"
+        );
         assert_eq!(
             std::fs::read_to_string(current.join(MARKER_FILE)).unwrap(),
             legacy.display().to_string()
@@ -135,7 +140,10 @@ mod tests {
         assert!(!legacy.join(MARKER_FILE).exists());
         assert_eq!(std::fs::read_dir(&base).unwrap().count(), 2);
         // A second launch does nothing.
-        assert_eq!(migrate_legacy_data_dir(&legacy, &current).unwrap(), Migration::NotNeeded);
+        assert_eq!(
+            migrate_legacy_data_dir(&legacy, &current).unwrap(),
+            Migration::NotNeeded
+        );
         std::fs::remove_dir_all(&base).unwrap();
     }
 
@@ -144,7 +152,10 @@ mod tests {
         let (base, legacy, current) = setup("occupied");
         std::fs::create_dir_all(&current).unwrap();
         std::fs::write(current.join("config.json"), b"mine").unwrap();
-        assert_eq!(migrate_legacy_data_dir(&legacy, &current).unwrap(), Migration::NotNeeded);
+        assert_eq!(
+            migrate_legacy_data_dir(&legacy, &current).unwrap(),
+            Migration::NotNeeded
+        );
         assert!(!current.join("vault.bin").exists());
         assert_eq!(std::fs::read(current.join("config.json")).unwrap(), b"mine");
         std::fs::remove_dir_all(&base).unwrap();
@@ -166,7 +177,10 @@ mod tests {
     fn needs_a_vault_in_the_old_dir() {
         let (base, legacy, current) = setup("novault");
         std::fs::remove_file(legacy.join("vault.bin")).unwrap();
-        assert_eq!(migrate_legacy_data_dir(&legacy, &current).unwrap(), Migration::NotNeeded);
+        assert_eq!(
+            migrate_legacy_data_dir(&legacy, &current).unwrap(),
+            Migration::NotNeeded
+        );
         assert!(!current.exists());
         // So does a missing old dir.
         assert_eq!(
@@ -197,8 +211,11 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let (base, legacy, current) = setup("perms");
         let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
-        std::fs::set_permissions(legacy.join("vault.bin"), std::fs::Permissions::from_mode(0o600))
-            .unwrap();
+        std::fs::set_permissions(
+            legacy.join("vault.bin"),
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
         std::fs::set_permissions(&legacy, std::fs::Permissions::from_mode(0o700)).unwrap();
         std::os::unix::fs::symlink("/etc/hosts", legacy.join("link")).unwrap();
         assert_eq!(

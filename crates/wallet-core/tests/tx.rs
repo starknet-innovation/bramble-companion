@@ -1,9 +1,9 @@
 //! Tests for selector derivation, multicall encoding, and invoke V3 signing.
 //! Public test vector only; no real key material.
 
-use wallet_core::{AccountContract, 
+use wallet_core::{
     declare_v3_hash, encode_calls, get_selector_from_name, invoke_v3_hash, resolve_selector,
-    sign_invoke_v3, Call, ChainId, Domain, Felt, InvokeV3Params, ResourceBounds,
+    sign_invoke_v3, AccountContract, Call, ChainId, Domain, Felt, InvokeV3Params, ResourceBounds,
 };
 
 const TEST_MNEMONIC: &str =
@@ -110,7 +110,11 @@ fn sample_calls() -> Vec<Call> {
     vec![Call {
         to: Felt::from_hex("0x49d36").unwrap(),
         selector: get_selector_from_name("transfer"),
-        calldata: vec![Felt::from_hex("0xdead").unwrap(), Felt::from(10000u64), Felt::ZERO],
+        calldata: vec![
+            Felt::from_hex("0xdead").unwrap(),
+            Felt::from(10000u64),
+            Felt::ZERO,
+        ],
     }]
 }
 
@@ -161,7 +165,14 @@ fn sign_invoke_v3_binds_signature_to_hash_and_account() {
 
     // Deterministic (RFC-6979).
     let again = sign_invoke_v3(
-        TEST_MNEMONIC, Domain::User, 0, None, &sender, &calls, ChainId::Sepolia, &params,
+        TEST_MNEMONIC,
+        Domain::User,
+        0,
+        None,
+        &sender,
+        &calls,
+        ChainId::Sepolia,
+        &params,
         AccountContract::OpenZeppelin,
     )
     .unwrap();
@@ -170,7 +181,14 @@ fn sign_invoke_v3_binds_signature_to_hash_and_account() {
 
     // A different account produces a different signature for the same tx.
     let other = sign_invoke_v3(
-        TEST_MNEMONIC, Domain::User, 1, None, &sender, &calls, ChainId::Sepolia, &params,
+        TEST_MNEMONIC,
+        Domain::User,
+        1,
+        None,
+        &sender,
+        &calls,
+        ChainId::Sepolia,
+        &params,
         AccountContract::OpenZeppelin,
     )
     .unwrap();
@@ -188,9 +206,18 @@ fn declare_v3_hash_matches_live_sepolia_transaction() {
     let params = InvokeV3Params {
         nonce: f("0x8"),
         tip: 0,
-        l1_gas: ResourceBounds { max_amount: 0x0, max_price_per_unit: 0xe316fc8256b1 },
-        l2_gas: ResourceBounds { max_amount: 0x1329dd40, max_price_per_unit: 0x9ca6e0222 },
-        l1_data_gas: ResourceBounds { max_amount: 0x120, max_price_per_unit: 0xeaaacb6cb9 },
+        l1_gas: ResourceBounds {
+            max_amount: 0x0,
+            max_price_per_unit: 0xe316fc8256b1,
+        },
+        l2_gas: ResourceBounds {
+            max_amount: 0x1329dd40,
+            max_price_per_unit: 0x9ca6e0222,
+        },
+        l1_data_gas: ResourceBounds {
+            max_amount: 0x120,
+            max_price_per_unit: 0xeaaacb6cb9,
+        },
         ..Default::default()
     };
     let hash = declare_v3_hash(

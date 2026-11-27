@@ -5,7 +5,7 @@
 //! Run: `cargo run -p wallet-rpc --example node_probe`
 //! Uses the `http://` URL on purpose to exercise http→https redirect handling.
 
-use wallet_core::{AccountContract, deployment_data, ChainId, Domain, Felt};
+use wallet_core::{deployment_data, AccountContract, ChainId, Domain, Felt};
 use wallet_rpc::{HttpStarknetRpc, StarknetRpc};
 
 const TEST_MNEMONIC: &str =
@@ -14,12 +14,17 @@ const TEST_MNEMONIC: &str =
 #[tokio::main]
 async fn main() {
     let node = HttpStarknetRpc::new("http://sepolia.nodes.starknet.org/rpc/v0_10");
-    let strk =
-        Felt::from_hex("0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d")
-            .unwrap();
+    let strk = Felt::from_hex("0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d")
+        .unwrap();
 
-    println!("is_deployed(STRK token) = {:?}", node.is_deployed(&strk).await);
-    println!("get_nonce(STRK token)   = {:?}", node.get_nonce(&strk).await);
+    println!(
+        "is_deployed(STRK token) = {:?}",
+        node.is_deployed(&strk).await
+    );
+    println!(
+        "get_nonce(STRK token)   = {:?}",
+        node.get_nonce(&strk).await
+    );
 
     let d = deployment_data(
         TEST_MNEMONIC,
@@ -30,7 +35,10 @@ async fn main() {
         AccountContract::OpenZeppelin,
     )
     .unwrap();
-    println!("is_deployed(test acct)  = {:?}", node.is_deployed(&d.address).await);
+    println!(
+        "is_deployed(test acct)  = {:?}",
+        node.is_deployed(&d.address).await
+    );
     let est = node
         .estimate_deploy_account(&d.address, &d.class_hash, &d.constructor_calldata, &d.salt)
         .await;

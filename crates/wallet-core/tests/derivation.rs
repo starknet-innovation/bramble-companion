@@ -56,7 +56,10 @@ fn addresses_are_wellformed_and_distinct_across_indices() {
     for i in 0..5u32 {
         let addr = oz_address(TEST_MNEMONIC, Domain::User, i, None, chain).unwrap();
         assert_ne!(addr, Felt::ZERO, "address must be non-zero");
-        assert!(seen.insert(addr), "addresses across indices must be distinct");
+        assert!(
+            seen.insert(addr),
+            "addresses across indices must be distinct"
+        );
 
         let hex = address_hex(&addr);
         assert!(hex.starts_with("0x"));
@@ -111,8 +114,14 @@ fn user_account_zero_is_the_canonical_first_account() {
 #[test]
 fn the_agent_branch_is_out_of_reach_of_account_enumeration() {
     let (agent_account, _) = Domain::Agent.path_indices(0);
-    assert!(agent_account > 1_000_000, "must be far beyond any wallet's scan");
-    assert_ne!(agent_account, 0x41, "0x41 became reachable once user accounts walked this axis");
+    assert!(
+        agent_account > 1_000_000,
+        "must be far beyond any wallet's scan"
+    );
+    assert_ne!(
+        agent_account, 0x41,
+        "0x41 became reachable once user accounts walked this axis"
+    );
 }
 
 #[test]

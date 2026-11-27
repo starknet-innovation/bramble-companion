@@ -52,7 +52,10 @@ pub struct RemoteProver {
 
 impl RemoteProver {
     pub fn new(settings: Arc<SettingsStore>) -> Self {
-        RemoteProver { settings, http: crate::snip36::http_client() }
+        RemoteProver {
+            settings,
+            http: crate::snip36::http_client(),
+        }
     }
 }
 

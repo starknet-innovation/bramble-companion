@@ -29,10 +29,7 @@ fn ciphertext_is_not_plaintext() {
     let secret = b"abandon abandon ... about";
     let vault = EncryptedVault::seal("pw", secret).unwrap();
     // The sealed blob must not contain the plaintext.
-    assert!(!vault
-        .ciphertext
-        .windows(secret.len())
-        .any(|w| w == secret));
+    assert!(!vault.ciphertext.windows(secret.len()).any(|w| w == secret));
 }
 
 #[test]
@@ -40,7 +37,10 @@ fn tamper_is_detected() {
     let mut vault = EncryptedVault::seal("pw", b"secret payload").unwrap();
     // Flip a byte in the ciphertext; AES-GCM tag must reject it.
     vault.ciphertext[0] ^= 0xff;
-    assert!(vault.open("pw").is_err(), "tampering must fail the AEAD tag");
+    assert!(
+        vault.open("pw").is_err(),
+        "tampering must fail the AEAD tag"
+    );
 }
 
 #[test]
@@ -124,7 +124,9 @@ fn registry_without_strk20_owners_is_unchanged_on_disk() {
     let old = r#"{"accounts":[{"domain":"user","index":0,"address":"0x0123","label":"Main"}]}"#;
     let reg: Registry = serde_json::from_str(old).unwrap();
     assert!(reg.strk20_owners.is_empty());
-    assert!(!serde_json::to_string(&reg).unwrap().contains("strk20_owners"));
+    assert!(!serde_json::to_string(&reg)
+        .unwrap()
+        .contains("strk20_owners"));
 }
 
 /// A vault from an older format must be reported as *unsupported*, not as a bad

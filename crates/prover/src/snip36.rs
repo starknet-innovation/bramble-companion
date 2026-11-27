@@ -58,7 +58,10 @@ fn bounded(s: &str, max: usize) -> String {
     let head_end = chars[..half].iter().rposition(is_cut).map_or(0, |i| i + 1);
     // Tail: from the first boundary char in the last `half`.
     let tail_from = chars.len() - half;
-    let tail_start = chars[tail_from..].iter().position(is_cut).map_or(chars.len(), |i| tail_from + i);
+    let tail_start = chars[tail_from..]
+        .iter()
+        .position(is_cut)
+        .map_or(chars.len(), |i| tail_from + i);
     let head: String = chars[..head_end].iter().collect();
     let tail: String = chars[tail_start..].iter().collect();
     format!("{} […] {}", head.trim_end(), tail.trim_start())
@@ -81,7 +84,12 @@ fn revert_reason(err: &str) -> Option<String> {
 /// A JSON-RPC call with explicit handling of redirects, non-2xx, and non-JSON
 /// bodies (each of which previously surfaced as `expected value at line 1
 /// column 1` with no context).
-async fn rpc_call(http: &reqwest::Client, rpc: &str, method: &str, params: Value) -> Result<Value, String> {
+async fn rpc_call(
+    http: &reqwest::Client,
+    rpc: &str,
+    method: &str,
+    params: Value,
+) -> Result<Value, String> {
     let resp = http
         .post(rpc)
         .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": method, "params": params }))
@@ -101,12 +109,19 @@ async fn rpc_call(http: &reqwest::Client, rpc: &str, method: &str, params: Value
              set the https URL directly in Settings (a 301 silently turns the POST into a GET)."
         ));
     }
-    let text = resp.text().await.map_err(|e| format!("rpc {method}: reading body failed ({e})"))?;
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("rpc {method}: reading body failed ({e})"))?;
     if !status.is_success() {
         return Err(format!("rpc {method}: HTTP {status}: {}", snippet(&text)));
     }
-    serde_json::from_str::<Value>(&text)
-        .map_err(|e| format!("rpc {method}: non-JSON response ({e}); body: {}", snippet(&text)))
+    serde_json::from_str::<Value>(&text).map_err(|e| {
+        format!(
+            "rpc {method}: non-JSON response ({e}); body: {}",
+            snippet(&text)
+        )
+    })
 }
 
 /// The sequencer's own sizing guidance for one SNIP-36 tx (its README and
@@ -173,7 +188,10 @@ pub fn classify_prover_error(stderr: &str) -> String {
              largest batch that proves and chunk below it. raw: {}",
             raw(stderr)
         )
-    } else if low.contains("429") || low.contains("too many requests") || low.contains("rpc provider error") {
+    } else if low.contains("429")
+        || low.contains("too many requests")
+        || low.contains("rpc provider error")
+    {
         format!(
             "upstream RPC throttled (HTTP 429 / provider error) — proving fetches lots of state; \
              use a higher-quota RPC in Settings. raw: {}",
@@ -229,9 +247,11 @@ fn check_signed(tx: &Value, allow_empty: bool) -> Result<(), String> {
     if signed {
         Ok(())
     } else {
-        Err("transaction is not signed (missing/empty `signature`); the prover proves \
+        Err(
+            "transaction is not signed (missing/empty `signature`); the prover proves \
              pre-signed transactions only and never signs"
-            .into())
+                .into(),
+        )
     }
 }
 
@@ -245,7 +265,10 @@ pub async fn preflight(
 ) -> Result<ProveInputs, String> {
     let net = settings.for_network(&req.network).await;
     if net.rpc_url.is_empty() {
-        return Err(format!("no RPC URL configured for {} (set it in Settings)", req.network));
+        return Err(format!(
+            "no RPC URL configured for {} (set it in Settings)",
+            req.network
+        ));
     }
 
     let tx = req
@@ -264,7 +287,13 @@ pub async fn preflight(
     check_nonce(http, &net.rpc_url, &tx, block_number).await?;
 
     let (chain_id, strk) = net_params(&req.network);
-    Ok(ProveInputs { tx, block_number, chain_id, strk, rpc_url: net.rpc_url })
+    Ok(ProveInputs {
+        tx,
+        block_number,
+        chain_id,
+        strk,
+        rpc_url: net.rpc_url,
+    })
 }
 
 /// The env vars the `snip36` CLI's shared config requires. `prove virtual-os`
@@ -310,14 +339,25 @@ async fn latest_block(http: &reqwest::Client, rpc: &str) -> Result<u64, String> 
 
 /// Fetch the account nonce at `block` and check it matches the tx nonce — saves
 /// a ~minute-long proof when the nonce is wrong.
-async fn check_nonce(http: &reqwest::Client, rpc: &str, tx: &Value, block: u64) -> Result<(), String> {
+async fn check_nonce(
+    http: &reqwest::Client,
+    rpc: &str,
+    tx: &Value,
+    block: u64,
+) -> Result<(), String> {
     let (Some(sender), Some(tx_nonce)) = (
         tx.get("sender_address").and_then(|v| v.as_str()),
         tx.get("nonce").and_then(|v| v.as_str()),
     ) else {
         return Ok(()); // can't check without sender + nonce
     };
-    let v = rpc_call(http, rpc, "starknet_getNonce", json!([{ "block_number": block }, sender])).await?;
+    let v = rpc_call(
+        http,
+        rpc,
+        "starknet_getNonce",
+        json!([{ "block_number": block }, sender]),
+    )
+    .await?;
     let Some(chain_nonce) = v.get("result").and_then(|r| r.as_str()) else {
         return Ok(()); // RPC didn't return a nonce; let the prover surface it
     };
@@ -351,12 +391,15 @@ pub(crate) async fn run_and_parse(
         .and_then(|s| s.parse().ok())
         .unwrap_or(900);
 
-    cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
     cmd.kill_on_drop(true); // reap the direct child if we bail
     #[cfg(unix)]
     cmd.process_group(0); // child leads its own group so we can reap grandchildren
 
-    let child = cmd.spawn().map_err(|e| format!("failed to launch prover ({launch_hint}): {e}"))?;
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("failed to launch prover ({launch_hint}): {e}"))?;
     #[cfg(unix)]
     let pgid = child.id().map(|p| p as i32);
     #[cfg(unix)]
@@ -370,7 +413,11 @@ pub(crate) async fn run_and_parse(
     #[cfg(unix)]
     let mut on_drop = GroupKiller(pgid);
 
-    let waited = tokio::time::timeout(std::time::Duration::from_secs(secs), child.wait_with_output()).await;
+    let waited = tokio::time::timeout(
+        std::time::Duration::from_secs(secs),
+        child.wait_with_output(),
+    )
+    .await;
     #[cfg(unix)]
     on_drop.disarm();
     let output = match waited {
@@ -387,7 +434,9 @@ pub(crate) async fn run_and_parse(
         // Reap any runner the CLI may have orphaned on failure.
         #[cfg(unix)]
         kill_group();
-        return Err(classify_prover_error(&String::from_utf8_lossy(&output.stderr)));
+        return Err(classify_prover_error(&String::from_utf8_lossy(
+            &output.stderr,
+        )));
     }
     parse_outputs(dir)
 }
@@ -425,7 +474,9 @@ mod tests {
         let one = json!({ "signature": ["0x1"] });
         assert!(super::check_signed(&one, false).is_ok());
         assert!(super::check_signed(&one, true).is_ok());
-        assert!(super::check_signed(&empty, false).unwrap_err().contains("not signed"));
+        assert!(super::check_signed(&empty, false)
+            .unwrap_err()
+            .contains("not signed"));
         assert!(super::check_signed(&empty, true).is_ok());
         assert!(super::check_signed(&missing, true).is_err());
         assert!(super::check_signed(&not_array, true).is_err());
@@ -437,13 +488,17 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn dropping_a_running_prove_kills_its_process_group() {
-        let dir = std::env::temp_dir().join(format!("bramble-companion-snip36-cancel-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "bramble-companion-snip36-cancel-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let pidfile = dir.join("grandchild.pid");
         let mut cmd = tokio::process::Command::new("sh");
         // A background grandchild (the "runner") plus a waiting parent.
-        cmd.arg("-c").arg(format!("sleep 60 & echo $! > {}; wait", pidfile.display()));
+        cmd.arg("-c")
+            .arg(format!("sleep 60 & echo $! > {}; wait", pidfile.display()));
         let run = super::run_and_parse(cmd, &dir, "test");
         let pid = tokio::select! {
             _ = run => panic!("the command should still be running"),
@@ -507,7 +562,10 @@ mod tests {
     fn log_lines_ahead_of_the_error_do_not_mask_it() {
         // A log line mentioning "429" must not be read as RPC throttling.
         let stderr = "  INFO fetched 429 storage keys\nError: \n   0: some other failure";
-        assert_eq!(classify_prover_error(stderr), "prover failed: Error: \n   0: some other failure");
+        assert_eq!(
+            classify_prover_error(stderr),
+            "prover failed: Error: \n   0: some other failure"
+        );
     }
 
     /// The shape from #50: the virtual tx reverted in the prover because the
@@ -532,14 +590,23 @@ mod tests {
     fn revert_reason_is_returned_whole() {
         let stderr = revert_stderr();
         let msg = classify_prover_error(&stderr);
-        assert!(msg.starts_with("the transaction reverted while it was proved"), "{msg}");
+        assert!(
+            msg.starts_with("the transaction reverted while it was proved"),
+            "{msg}"
+        );
         assert!(msg.contains("deployed at that block"), "{msg}");
         // The full reason survives, through the tail of the trace, and the
         // JSON-RPC envelope after it is dropped.
-        assert!(msg.contains("Error in the called contract (contract address: 0x"), "{msg}");
+        assert!(
+            msg.contains("Error in the called contract (contract address: 0x"),
+            "{msg}"
+        );
         assert!(msg.ends_with("is not deployed."), "{msg}");
         assert!(msg.contains(&format!("0x{:064x}", 0xb0b_u64)), "{msg}");
-        assert!(!msg.contains("Internal error") && !msg.contains('\u{1b}'), "{msg}");
+        assert!(
+            !msg.contains("Internal error") && !msg.contains('\u{1b}'),
+            "{msg}"
+        );
         assert!(msg.chars().count() > 300);
     }
 
@@ -548,8 +615,15 @@ mod tests {
         let filler = "x".repeat(10) + " ";
         let stderr = format!("Error: start {} the actual cause", filler.repeat(1000));
         let msg = classify_prover_error(&stderr);
-        assert!(msg.chars().count() <= MAX_PROVER_ERROR_CHARS + 40, "{}", msg.len());
-        assert!(msg.starts_with("prover failed: Error: start") && msg.ends_with("the actual cause"), "{msg}");
+        assert!(
+            msg.chars().count() <= MAX_PROVER_ERROR_CHARS + 40,
+            "{}",
+            msg.len()
+        );
+        assert!(
+            msg.starts_with("prover failed: Error: start") && msg.ends_with("the actual cause"),
+            "{msg}"
+        );
         assert!(msg.contains(" […] "));
     }
 
@@ -562,7 +636,10 @@ mod tests {
         let text = vec![word.as_str(); 200].join(", ");
         let out = bounded(&text, 1000);
         assert!(out.chars().count() <= 1000 + 5);
-        for part in out.split(|c: char| !c.is_ascii_alphanumeric()).filter(|p| !p.is_empty()) {
+        for part in out
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|p| !p.is_empty())
+        {
             assert_eq!(part, word, "split value");
         }
         // Short text is untouched apart from trimming.

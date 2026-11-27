@@ -26,14 +26,14 @@ pub use domain::{Domain, AGENT_ACCOUNT_INDEX, STARKNET_COIN_TYPE, USER_ACCOUNT_I
 pub use error::{CoreError, Result};
 pub use keys::{
     account_address, deployment_data, oz_address, public_key, public_key_of_key, sign_hash,
-    sign_hash_with_key, sign_typed_data, strk20_owner_viewing_key, strk20_owner_viewing_key_message,
-    strk20_viewing_key, typed_data_message_hash, STRK20_OWNER_KEY_TAG,
+    sign_hash_with_key, sign_typed_data, strk20_owner_viewing_key,
+    strk20_owner_viewing_key_message, strk20_viewing_key, typed_data_message_hash,
+    STRK20_OWNER_KEY_TAG,
 };
 pub use tx::{
     declare_v3_hash, encode_calls, get_selector_from_name, invoke_v3_hash, resolve_selector,
-    sign_declare_v3,
-    sign_deploy_account_v3, sign_invoke_v3, starknet_keccak, Call, InvokeV3Params, SignedDeclare,
-    SignedDeployAccount, SignedInvoke,
+    sign_declare_v3, sign_deploy_account_v3, sign_invoke_v3, starknet_keccak, Call, InvokeV3Params,
+    SignedDeclare, SignedDeployAccount, SignedInvoke,
 };
 pub use vault::EncryptedVault;
 

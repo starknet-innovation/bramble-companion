@@ -78,7 +78,11 @@ pub const STRK20_OWNER_KEY_TAG: &str = "strkd.strk20.owner.v1";
 /// The hash a controller key signs to derive an owner's STRK20 viewing key:
 /// `starknet_keccak("strkd.strk20.owner.v1:<chain_id>:<pool>:<owner>")`, each
 /// value as shortest lowercase `0x` hex. Zero values are refused.
-pub fn strk20_owner_viewing_key_message(chain_id: &Felt, pool: &Felt, owner: &Felt) -> Result<Felt> {
+pub fn strk20_owner_viewing_key_message(
+    chain_id: &Felt,
+    pool: &Felt,
+    owner: &Felt,
+) -> Result<Felt> {
     if [chain_id, pool, owner].iter().any(|f| **f == Felt::ZERO) {
         return Err(CoreError::Derivation);
     }
@@ -111,7 +115,8 @@ pub fn strk20_owner_viewing_key(
     let message = strk20_owner_viewing_key_message(chain_id, pool, owner)?;
     let sk = private_key(mnemonic, domain, index, passphrase)?;
     let sig = sign_stark_hash(&sk, &message).map_err(|_| CoreError::Derivation)?;
-    fold_strk20_viewing_key(&sig.public_key, &message, &sig.r, &sig.s).map_err(|_| CoreError::Derivation)
+    fold_strk20_viewing_key(&sig.public_key, &message, &sig.r, &sig.s)
+        .map_err(|_| CoreError::Derivation)
 }
 /// Compute the Stark public key for `(domain, index)`.
 pub fn public_key(
@@ -201,7 +206,8 @@ pub fn sign_typed_data(
 /// callers can use it to verify Bramble Companion's hashing matches their expectation both
 /// before and after signing. Delegated to `krusty-kms`.
 pub fn typed_data_message_hash(typed_data_json: &str, account_address: &Felt) -> Result<Felt> {
-    compute_typed_data_message_hash(typed_data_json, account_address).map_err(|_| CoreError::Signing)
+    compute_typed_data_message_hash(typed_data_json, account_address)
+        .map_err(|_| CoreError::Signing)
 }
 
 /// Sign an already-computed message hash with the key for `(domain, index)`.

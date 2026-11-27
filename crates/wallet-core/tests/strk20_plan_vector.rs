@@ -32,10 +32,17 @@ fn felt(v: &Value) -> Felt {
 #[test]
 fn actions_hash_is_poseidon_of_the_client_action_felts() {
     let d = doc();
-    let felts: Vec<Felt> =
-        d["inputs"]["client_actions_felts"].as_array().unwrap().iter().map(felt).collect();
+    let felts: Vec<Felt> = d["inputs"]["client_actions_felts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(felt)
+        .collect();
     assert_eq!(Poseidon::hash_array(&felts), felt(&d["actions_hash"]));
-    assert_eq!(felt(&d["typed_data"]["message"]["actions_hash"]), felt(&d["actions_hash"]));
+    assert_eq!(
+        felt(&d["typed_data"]["message"]["actions_hash"]),
+        felt(&d["actions_hash"])
+    );
 }
 
 #[test]
@@ -44,7 +51,11 @@ fn the_message_binds_the_vector_inputs() {
     let msg = &d["typed_data"]["message"];
     assert_eq!(felt(&msg["pool"]), felt(&d["inputs"]["pool"]));
     assert_eq!(felt(&msg["owner"]), felt(&d["inputs"]["owner"]));
-    assert_eq!(felt(&d["account_address"]), felt(&d["inputs"]["owner"]), "signer = owner");
+    assert_eq!(
+        felt(&d["account_address"]),
+        felt(&d["inputs"]["owner"]),
+        "signer = owner"
+    );
     assert_eq!(
         Felt::from_bytes_be_slice(d["inputs"]["chain_id"].as_str().unwrap().as_bytes()),
         felt(&d["inputs"]["chain_id_felt"]),
@@ -56,7 +67,11 @@ fn plan_hash_reproduces() {
     let d = doc();
     let h = typed_data_message_hash(&d["typed_data"].to_string(), &felt(&d["account_address"]))
         .unwrap();
-    assert_eq!(address_hex(&h), d["plan_hash"].as_str().unwrap(), "Strk20Plan digest drifted");
+    assert_eq!(
+        address_hex(&h),
+        d["plan_hash"].as_str().unwrap(),
+        "Strk20Plan digest drifted"
+    );
 }
 
 /// `"version": "1"` is the felt 1, not the shortstring 0x31 (same rule as
@@ -71,8 +86,14 @@ fn domain_version_one_is_the_number_one() {
     as_num["domain"]["version"] = Value::from("0x1");
     let owner = felt(&d["account_address"]);
     let want = felt(&d["plan_hash"]);
-    assert_eq!(typed_data_message_hash(&as_num.to_string(), &owner).unwrap(), want);
-    assert_ne!(typed_data_message_hash(&as_short.to_string(), &owner).unwrap(), want);
+    assert_eq!(
+        typed_data_message_hash(&as_num.to_string(), &owner).unwrap(),
+        want
+    );
+    assert_ne!(
+        typed_data_message_hash(&as_short.to_string(), &owner).unwrap(),
+        want
+    );
 }
 
 /// The Cairo test file must carry exactly these constants.
@@ -94,7 +115,11 @@ fn the_cairo_test_carries_the_same_constants() {
             .unwrap_or_else(|| panic!("{name} missing from test_owner.cairo"))
             .1;
         let value = rest.split(';').next().unwrap().trim();
-        assert_eq!(Felt::from_hex(value).unwrap(), want, "{name} in test_owner.cairo drifted");
+        assert_eq!(
+            Felt::from_hex(value).unwrap(),
+            want,
+            "{name} in test_owner.cairo drifted"
+        );
     }
     let felts: Vec<String> = d["inputs"]["client_actions_felts"]
         .as_array()
@@ -103,5 +128,8 @@ fn the_cairo_test_carries_the_same_constants() {
         .map(|v| v.as_str().unwrap().to_string())
         .collect();
     let arr = format!("array![{}]", felts.join(", "));
-    assert!(CAIRO_TEST.contains(&arr), "client_actions_felts in test_owner.cairo drifted");
+    assert!(
+        CAIRO_TEST.contains(&arr),
+        "client_actions_felts in test_owner.cairo drifted"
+    );
 }

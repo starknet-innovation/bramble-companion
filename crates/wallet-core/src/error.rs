@@ -41,7 +41,10 @@ pub enum CoreError {
 
     /// An account number outside its branch (see `Domain::check_index`).
     #[error("account index {index} is out of range for the {domain:?} branch")]
-    IndexOutOfRange { domain: crate::domain::Domain, index: u32 },
+    IndexOutOfRange {
+        domain: crate::domain::Domain,
+        index: u32,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, CoreError>;

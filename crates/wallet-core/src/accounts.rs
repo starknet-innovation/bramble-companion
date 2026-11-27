@@ -61,7 +61,10 @@ impl Strk20Owner {
     /// Whether this record is the one for `owner` on `(chain, pool)` within the
     /// scope `client_id` (see [`Registry::scoped_for`]).
     pub fn is(&self, owner: &str, chain: ChainId, pool: &str, client_id: Option<&str>) -> bool {
-        self.owner == owner && self.chain == chain && self.pool == pool && self.client_id.as_deref() == client_id
+        self.owner == owner
+            && self.chain == chain
+            && self.pool == pool
+            && self.client_id.as_deref() == client_id
     }
 }
 
@@ -122,17 +125,26 @@ impl Registry {
 
     /// STRK20 owners visible to a caller, by the same rule as [`Self::scoped_for`]:
     /// an agent sees the owners it enrolled, a user/app caller the user's.
-    pub fn strk20_owners_for<'a>(&'a self, client_id: Option<&'a str>) -> impl Iterator<Item = &'a Strk20Owner> + 'a {
-        self.strk20_owners.iter().filter(move |o| o.client_id.as_deref() == client_id)
+    pub fn strk20_owners_for<'a>(
+        &'a self,
+        client_id: Option<&'a str>,
+    ) -> impl Iterator<Item = &'a Strk20Owner> + 'a {
+        self.strk20_owners
+            .iter()
+            .filter(move |o| o.client_id.as_deref() == client_id)
     }
 
     /// Add an owner record. Returns false (and adds nothing) if the same owner
     /// is already enrolled on that chain and pool in the same scope.
     pub fn add_strk20_owner(&mut self, owner: Strk20Owner) -> bool {
-        let dup = self
-            .strk20_owners
-            .iter()
-            .any(|o| o.is(&owner.owner, owner.chain, &owner.pool, owner.client_id.as_deref()));
+        let dup = self.strk20_owners.iter().any(|o| {
+            o.is(
+                &owner.owner,
+                owner.chain,
+                &owner.pool,
+                owner.client_id.as_deref(),
+            )
+        });
         if !dup {
             self.strk20_owners.push(owner);
         }
@@ -147,7 +159,10 @@ impl Registry {
         pool: &str,
         client_id: Option<&str>,
     ) -> Option<Strk20Owner> {
-        let i = self.strk20_owners.iter().position(|o| o.is(owner, chain, pool, client_id))?;
+        let i = self
+            .strk20_owners
+            .iter()
+            .position(|o| o.is(owner, chain, pool, client_id))?;
         Some(self.strk20_owners.remove(i))
     }
 }

@@ -148,7 +148,9 @@ impl Storage {
     pub fn get_record(&self, job_id: &str) -> Option<ProofRecord> {
         // Guard against path traversal — job ids are simple tokens.
         if job_id.is_empty()
-            || !job_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            || !job_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
         {
             return None;
         }

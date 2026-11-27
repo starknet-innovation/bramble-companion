@@ -39,7 +39,10 @@ impl DepositProver {
     /// missing.
     pub fn resolve(cfg: &Strk20Config, chain: ChainId) -> Result<Self, String> {
         if !cfg.deposit_prover_url.trim().is_empty() {
-            return Ok(DepositProver::JsonRpc { url: cfg.deposit_prover_url.trim().to_string(), label: "your deposit prover" });
+            return Ok(DepositProver::JsonRpc {
+                url: cfg.deposit_prover_url.trim().to_string(),
+                label: "your deposit prover",
+            });
         }
         match chain {
             ChainId::Mainnet if !cfg.starkscan_api_key.trim().is_empty() => {
@@ -78,10 +81,17 @@ pub enum RemoteError {
 impl std::fmt::Display for RemoteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RemoteError::ScreeningRejected(m) => write!(f, "deposit screening rejected the depositor: {m}"),
-            RemoteError::Unavailable(m) => write!(f, "deposit prover unavailable, try again later: {m}"),
+            RemoteError::ScreeningRejected(m) => {
+                write!(f, "deposit screening rejected the depositor: {m}")
+            }
+            RemoteError::Unavailable(m) => {
+                write!(f, "deposit prover unavailable, try again later: {m}")
+            }
             RemoteError::DeliveryUnknown(m) => {
-                write!(f, "the deposit prover's result was lost; do not resubmit before checking: {m}")
+                write!(
+                    f,
+                    "the deposit prover's result was lost; do not resubmit before checking: {m}"
+                )
             }
             RemoteError::Other(m) => write!(f, "deposit prover error: {m}"),
         }
@@ -95,15 +105,22 @@ pub fn classify_rpc_error(err: &Value) -> RemoteError {
     let data = err.get("data").and_then(Value::as_str).unwrap_or_default();
     let text = err.to_string();
     match (code, data) {
-        (Some(10000), "address_blocked") => RemoteError::ScreeningRejected("address_blocked".into()),
-        (Some(10000), "screening_unavailable" | "screening_policy_unavailable") => RemoteError::Unavailable(data.into()),
+        (Some(10000), "address_blocked") => {
+            RemoteError::ScreeningRejected("address_blocked".into())
+        }
+        (Some(10000), "screening_unavailable" | "screening_policy_unavailable") => {
+            RemoteError::Unavailable(data.into())
+        }
         (Some(-32005), _) => RemoteError::Unavailable(text),
         _ => RemoteError::Other(text),
     }
 }
 
 fn http() -> reqwest::Client {
-    reqwest::Client::builder().timeout(Duration::from_secs(900)).build().unwrap_or_default()
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(900))
+        .build()
+        .unwrap_or_default()
 }
 
 fn chain_slug(chain: ChainId) -> &'static str {
@@ -129,21 +146,37 @@ pub async fn prove(
     }
 }
 
-async fn prove_json_rpc(url: &str, block_number: u64, transaction: &Value) -> Result<Value, RemoteError> {
+async fn prove_json_rpc(
+    url: &str,
+    block_number: u64,
+    transaction: &Value,
+) -> Result<Value, RemoteError> {
     let body = json!({
         "jsonrpc": "2.0", "id": 1, "method": "starknet_proveTransaction",
         "params": { "block_id": { "block_number": block_number }, "transaction": transaction },
     });
-    let resp = http().post(url).json(&body).send().await.map_err(|e| RemoteError::Unavailable(e.to_string()))?;
+    let resp = http()
+        .post(url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| RemoteError::Unavailable(e.to_string()))?;
     let status = resp.status();
-    if status == reqwest::StatusCode::SERVICE_UNAVAILABLE || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+    if status == reqwest::StatusCode::SERVICE_UNAVAILABLE
+        || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+    {
         return Err(RemoteError::Unavailable(format!("HTTP {status}")));
     }
-    let v: Value = resp.json().await.map_err(|e| RemoteError::Other(format!("HTTP {status}: {e}")))?;
+    let v: Value = resp
+        .json()
+        .await
+        .map_err(|e| RemoteError::Other(format!("HTTP {status}: {e}")))?;
     if let Some(err) = v.get("error") {
         return Err(classify_rpc_error(err));
     }
-    v.get("result").cloned().ok_or_else(|| RemoteError::Other("no result".into()))
+    v.get("result")
+        .cloned()
+        .ok_or_else(|| RemoteError::Other("no result".into()))
 }
 
 /// Starkscan's relay: submit with an idempotency key, then poll. The proof is
@@ -156,10 +189,16 @@ pub(crate) async fn prove_starkscan(
     transaction: &Value,
 ) -> Result<Value, RemoteError> {
     if chain != ChainId::Mainnet {
-        return Err(RemoteError::Other("Starkscan's STRK20 prover is mainnet-only".into()));
+        return Err(RemoteError::Other(
+            "Starkscan's STRK20 prover is mainnet-only".into(),
+        ));
     }
     let client = http();
-    let root = format!("{}/v1/{}/prove", base.trim_end_matches('/'), chain_slug(chain));
+    let root = format!(
+        "{}/v1/{}/prove",
+        base.trim_end_matches('/'),
+        chain_slug(chain)
+    );
     let idempotency_key = random_key();
     let body = json!({ "block_id": { "block_number": block_number }, "transaction": transaction });
 
@@ -179,8 +218,14 @@ pub(crate) async fn prove_starkscan(
         if !status.is_success() {
             return Err(starkscan_http_error(status, &v));
         }
-        let job = v.get("jobId").and_then(Value::as_str).ok_or_else(|| RemoteError::Other(format!("no jobId in {v}")))?;
-        let mut wait = v.get("pollAfterSeconds").and_then(Value::as_u64).unwrap_or(5);
+        let job = v
+            .get("jobId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| RemoteError::Other(format!("no jobId in {v}")))?;
+        let mut wait = v
+            .get("pollAfterSeconds")
+            .and_then(Value::as_u64)
+            .unwrap_or(5);
         loop {
             tokio::time::sleep(Duration::from_secs(wait.clamp(1, 30))).await;
             let resp = client
@@ -199,7 +244,9 @@ pub(crate) async fn prove_starkscan(
                     return v.get("result").cloned().ok_or_else(|| {
                         RemoteError::DeliveryUnknown(format!(
                             "job {job} succeeded but carried no result ({})",
-                            v.get("resultUnavailableReason").cloned().unwrap_or(Value::Null)
+                            v.get("resultUnavailableReason")
+                                .cloned()
+                                .unwrap_or(Value::Null)
                         ))
                     })
                 }
@@ -209,21 +256,34 @@ pub(crate) async fn prove_starkscan(
                 }
                 Some("unavailable") => break, // resubmit with the same key
                 Some("unknown_delivery") => {
-                    return Err(RemoteError::DeliveryUnknown(format!("job {job}: prover_delivery_unknown")))
+                    return Err(RemoteError::DeliveryUnknown(format!(
+                        "job {job}: prover_delivery_unknown"
+                    )))
                 }
-                _ => wait = v.get("pollAfterSeconds").and_then(Value::as_u64).unwrap_or(5),
+                _ => {
+                    wait = v
+                        .get("pollAfterSeconds")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(5)
+                }
             }
         }
     }
-    Err(RemoteError::Unavailable("Starkscan kept reporting the prover unavailable".into()))
+    Err(RemoteError::Unavailable(
+        "Starkscan kept reporting the prover unavailable".into(),
+    ))
 }
 
 fn starkscan_http_error(status: reqwest::StatusCode, body: &Value) -> RemoteError {
     let what = body.get("error").cloned().unwrap_or_else(|| body.clone());
     match status.as_u16() {
         401 => RemoteError::Other(format!("Starkscan rejected the API key ({what})")),
-        403 => RemoteError::Other(format!("the Starkscan API key lacks the `prove` scope ({what})")),
-        404 => RemoteError::Unavailable(format!("Starkscan's STRK20 relay is not enabled ({what})")),
+        403 => RemoteError::Other(format!(
+            "the Starkscan API key lacks the `prove` scope ({what})"
+        )),
+        404 => {
+            RemoteError::Unavailable(format!("Starkscan's STRK20 relay is not enabled ({what})"))
+        }
         429 | 503 => RemoteError::Unavailable(format!("HTTP {status}: {what}")),
         _ => RemoteError::Other(format!("HTTP {status}: {what}")),
     }
@@ -250,22 +310,49 @@ pub fn parse_result(result: &Value, pool: &Felt) -> Result<ProvedInvocation, Str
         v.as_array()
             .ok_or_else(|| format!("{what}: not an array"))?
             .iter()
-            .map(|x| x.as_str().and_then(|s| Felt::from_hex(s).ok()).ok_or_else(|| format!("{what}: bad felt {x}")))
+            .map(|x| {
+                x.as_str()
+                    .and_then(|s| Felt::from_hex(s).ok())
+                    .ok_or_else(|| format!("{what}: bad felt {x}"))
+            })
             .collect()
     };
-    let proof = result.get("proof").and_then(Value::as_str).ok_or("no proof in the prover result")?.to_string();
-    let proof_facts = felts(result.get("proof_facts").unwrap_or(&Value::Null), "proof_facts")?;
-    let messages = result.get("l2_to_l1_messages").and_then(Value::as_array).ok_or("no l2_to_l1_messages")?;
+    let proof = result
+        .get("proof")
+        .and_then(Value::as_str)
+        .ok_or("no proof in the prover result")?
+        .to_string();
+    let proof_facts = felts(
+        result.get("proof_facts").unwrap_or(&Value::Null),
+        "proof_facts",
+    )?;
+    let messages = result
+        .get("l2_to_l1_messages")
+        .and_then(Value::as_array)
+        .ok_or("no l2_to_l1_messages")?;
     let message = messages
         .iter()
-        .find(|m| m.get("from_address").and_then(Value::as_str).and_then(|s| Felt::from_hex(s).ok()) == Some(*pool))
+        .find(|m| {
+            m.get("from_address")
+                .and_then(Value::as_str)
+                .and_then(|s| Felt::from_hex(s).ok())
+                == Some(*pool)
+        })
         .ok_or("the proof carries no message from the pool")?;
     let output = felts(message.get("payload").unwrap_or(&Value::Null), "payload")?;
     let screening = match result.pointer("/additional_data/signature") {
         None | Some(Value::Null) => None,
-        Some(sig) => Some(serde_json::from_value(sig.clone()).map_err(|e| format!("bad screening attestation: {e}"))?),
+        Some(sig) => Some(
+            serde_json::from_value(sig.clone())
+                .map_err(|e| format!("bad screening attestation: {e}"))?,
+        ),
     };
-    Ok(ProvedInvocation { proof, proof_facts, output, screening })
+    Ok(ProvedInvocation {
+        proof,
+        proof_facts,
+        output,
+        screening,
+    })
 }
 
 #[cfg(test)]
@@ -275,12 +362,22 @@ mod tests {
     #[test]
     fn resolves_deposit_prover_by_precedence() {
         let mut cfg = Strk20Config::default();
-        assert!(matches!(DepositProver::resolve(&cfg, ChainId::Mainnet), Ok(DepositProver::JsonRpc { url, .. }) if url == BRAMBLE_PROVER_URL));
+        assert!(
+            matches!(DepositProver::resolve(&cfg, ChainId::Mainnet), Ok(DepositProver::JsonRpc { url, .. }) if url == BRAMBLE_PROVER_URL)
+        );
         assert!(DepositProver::resolve(&cfg, ChainId::Sepolia).is_err());
         cfg.starkscan_api_key = "k".into();
-        assert_eq!(DepositProver::resolve(&cfg, ChainId::Mainnet), Ok(DepositProver::Starkscan { api_key: "k".into() }));
+        assert_eq!(
+            DepositProver::resolve(&cfg, ChainId::Mainnet),
+            Ok(DepositProver::Starkscan {
+                api_key: "k".into()
+            })
+        );
         cfg.deposit_prover_url = "http://localhost:1".into();
-        assert!(matches!(DepositProver::resolve(&cfg, ChainId::Sepolia), Ok(DepositProver::JsonRpc { .. })));
+        assert!(matches!(
+            DepositProver::resolve(&cfg, ChainId::Sepolia),
+            Ok(DepositProver::JsonRpc { .. })
+        ));
     }
 
     #[test]
@@ -289,9 +386,18 @@ mod tests {
             classify_rpc_error(&json!({"code": 10000, "data": "address_blocked"})),
             RemoteError::ScreeningRejected("address_blocked".into())
         );
-        assert!(matches!(classify_rpc_error(&json!({"code": 10000, "data": "screening_unavailable"})), RemoteError::Unavailable(_)));
-        assert!(matches!(classify_rpc_error(&json!({"code": 10000, "data": "boom"})), RemoteError::Other(_)));
-        assert!(matches!(classify_rpc_error(&json!({"code": -32005})), RemoteError::Unavailable(_)));
+        assert!(matches!(
+            classify_rpc_error(&json!({"code": 10000, "data": "screening_unavailable"})),
+            RemoteError::Unavailable(_)
+        ));
+        assert!(matches!(
+            classify_rpc_error(&json!({"code": 10000, "data": "boom"})),
+            RemoteError::Other(_)
+        ));
+        assert!(matches!(
+            classify_rpc_error(&json!({"code": -32005})),
+            RemoteError::Unavailable(_)
+        ));
     }
 
     #[test]

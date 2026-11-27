@@ -24,9 +24,11 @@ use crate::apply::ScreeningAttestation;
 use crate::hashes::short_string;
 
 /// `starknet_keccak` of SNIP-12's revision-1 `StarknetDomain` type.
-pub const STARKNET_DOMAIN_TYPE_HASH: &str = "0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210";
+pub const STARKNET_DOMAIN_TYPE_HASH: &str =
+    "0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210";
 /// `starknet_keccak("\"DepositorValidation\"(\"depositor\":\"ContractAddress\",\"issued_at\":\"u128\")")`.
-pub const DEPOSITOR_VALIDATION_TYPE_HASH: &str = "0x32d43b7372c9ea8a35daf12b02c5f6f74837910ecbaf2a3ecfe71fec901913d";
+pub const DEPOSITOR_VALIDATION_TYPE_HASH: &str =
+    "0x32d43b7372c9ea8a35daf12b02c5f6f74837910ecbaf2a3ecfe71fec901913d";
 /// Domain name `'Screening'`; the version is the numeric felt 2, not `'2'`.
 const DOMAIN_NAME: &str = "Screening";
 const DOMAIN_VERSION: u64 = 2;
@@ -38,7 +40,12 @@ fn constant(s: &str) -> Felt {
 
 /// The message hash the pool verifies for `depositor` at `issued_at` on
 /// `chain_id`, under the screener key `signer_public_key`.
-pub fn message_hash(chain_id: Felt, depositor: Felt, issued_at: u64, signer_public_key: Felt) -> Felt {
+pub fn message_hash(
+    chain_id: Felt,
+    depositor: Felt,
+    issued_at: u64,
+    signer_public_key: Felt,
+) -> Felt {
     let domain = Poseidon::hash_array(&[
         constant(STARKNET_DOMAIN_TYPE_HASH),
         short_string(DOMAIN_NAME),
@@ -46,8 +53,17 @@ pub fn message_hash(chain_id: Felt, depositor: Felt, issued_at: u64, signer_publ
         chain_id,
         Felt::from(DOMAIN_REVISION),
     ]);
-    let message = Poseidon::hash_array(&[constant(DEPOSITOR_VALIDATION_TYPE_HASH), depositor, Felt::from(issued_at)]);
-    Poseidon::hash_array(&[short_string("StarkNet Message"), domain, signer_public_key, message])
+    let message = Poseidon::hash_array(&[
+        constant(DEPOSITOR_VALIDATION_TYPE_HASH),
+        depositor,
+        Felt::from(issued_at),
+    ]);
+    Poseidon::hash_array(&[
+        short_string("StarkNet Message"),
+        domain,
+        signer_public_key,
+        message,
+    ])
 }
 
 /// Sign an attestation for `depositor` with a screener private key. The key is
@@ -61,7 +77,11 @@ pub fn attest(
     let public_key = wallet_core::public_key_of_key(screener_key)?;
     let hash = message_hash(chain_id, depositor, issued_at, public_key);
     let sig = wallet_core::sign_hash_with_key(screener_key, &hash)?;
-    Ok(ScreeningAttestation { issued_at, sig_r: sig.r, sig_s: sig.s })
+    Ok(ScreeningAttestation {
+        issued_at,
+        sig_r: sig.r,
+        sig_s: sig.s,
+    })
 }
 
 #[cfg(test)]
@@ -74,8 +94,9 @@ mod tests {
             b"\"StarknetDomain\"(\"name\":\"shortstring\",\"version\":\"shortstring\",\"chainId\":\"shortstring\",\"revision\":\"shortstring\")",
         );
         assert_eq!(domain, constant(STARKNET_DOMAIN_TYPE_HASH));
-        let validation =
-            wallet_core::starknet_keccak(b"\"DepositorValidation\"(\"depositor\":\"ContractAddress\",\"issued_at\":\"u128\")");
+        let validation = wallet_core::starknet_keccak(
+            b"\"DepositorValidation\"(\"depositor\":\"ContractAddress\",\"issued_at\":\"u128\")",
+        );
         assert_eq!(validation, constant(DEPOSITOR_VALIDATION_TYPE_HASH));
     }
 }

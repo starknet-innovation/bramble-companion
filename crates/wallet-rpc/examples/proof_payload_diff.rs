@@ -282,26 +282,53 @@ fn main() {
     // Felt VALUES are illustrative; their FORMATTING is Bramble Companion's real `fh`
     // (unpadded lowercase hex), so the spec checks reflect production output.
     let sender = felt("0x49d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7");
-    let calldata: Vec<Felt> = ["0x1", "0x6d6f7665", "0x7665726966795f6d6f7665", "0x3", "0xa", "0xb", "0xc"]
-        .iter()
-        .map(|s| felt(s))
-        .collect();
+    let calldata: Vec<Felt> = [
+        "0x1",
+        "0x6d6f7665",
+        "0x7665726966795f6d6f7665",
+        "0x3",
+        "0xa",
+        "0xb",
+        "0xc",
+    ]
+    .iter()
+    .map(|s| felt(s))
+    .collect();
     let signature = vec![felt("0x1a2b3c"), felt("0x4d5e6f")];
     let nonce = felt("0x7");
     // SNIP-36 proof_facts, indices [0..=8]: [7]=n_messages, [8]=message hash.
-    let proof_facts: Vec<Felt> = ["0x0", "0x0", "0x1234", "0x0", "0x64", "0xabc", "0xdef", "0x1", "0x9f8e7d"]
-        .iter()
-        .map(|s| felt(s))
-        .collect();
+    let proof_facts: Vec<Felt> = [
+        "0x0", "0x0", "0x1234", "0x0", "0x64", "0xabc", "0xdef", "0x1", "0x9f8e7d",
+    ]
+    .iter()
+    .map(|s| felt(s))
+    .collect();
     let proof = "AQIDBAUGBwgJCgsMDQ4PEA==";
 
     let bounds = FeeBounds {
-        l1_gas: ResourceBounds { max_amount: 0xbd2a, max_price_per_unit: 0x5af3107a4000 },
-        l2_gas: ResourceBounds { max_amount: 0x279fc0, max_price_per_unit: 0x174876e800 },
-        l1_data_gas: ResourceBounds { max_amount: 0xc0, max_price_per_unit: 0x3b9aca00 },
+        l1_gas: ResourceBounds {
+            max_amount: 0xbd2a,
+            max_price_per_unit: 0x5af3107a4000,
+        },
+        l2_gas: ResourceBounds {
+            max_amount: 0x279fc0,
+            max_price_per_unit: 0x174876e800,
+        },
+        l1_data_gas: ResourceBounds {
+            max_amount: 0xc0,
+            max_price_per_unit: 0x3b9aca00,
+        },
     };
 
-    let tx = invoke_v3_tx_json(&sender, &calldata, &signature, &nonce, &bounds, &proof_facts, Some(proof));
+    let tx = invoke_v3_tx_json(
+        &sender,
+        &calldata,
+        &signature,
+        &nonce,
+        &bounds,
+        &proof_facts,
+        Some(proof),
+    );
 
     let arg = std::env::args().nth(1);
 
@@ -319,7 +346,12 @@ fn main() {
     for l in &c.lines {
         println!("{l}");
     }
-    println!("  → {} ok, {} warn, {} FAIL\n", c.lines.len() as u32 - c.warns - c.fails, c.warns, c.fails);
+    println!(
+        "  → {} ok, {} warn, {} FAIL\n",
+        c.lines.len() as u32 - c.warns - c.fails,
+        c.warns,
+        c.fails
+    );
 
     match arg {
         None => {

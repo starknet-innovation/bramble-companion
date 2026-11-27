@@ -96,7 +96,9 @@ pub trait StarknetRpc: Send + Sync {
     /// discovery). Node clients that can't forward arbitrary methods say so.
     async fn raw(&self, method: &str, params: Value) -> Result<Value, NodeError> {
         let _ = params;
-        Err(NodeError::Rpc(format!("{method}: not supported by this node client")))
+        Err(NodeError::Rpc(format!(
+            "{method}: not supported by this node client"
+        )))
     }
 
     /// Whether `address` has a deployed contract class (false = counterfactual).
@@ -293,7 +295,6 @@ impl HttpStarknetRpc {
         u128::from_str_radix(s, 16).map_err(|_| NodeError::Decode(format!("{what}: bad u128")))
     }
 
-
     /// DEPLOY_ACCOUNT v3 tx JSON shared by estimate (empty sig, zero bounds) and
     /// broadcast (real sig + bounds). Nonce is always 0.
     fn deploy_account_tx_json(
@@ -388,7 +389,15 @@ impl StarknetRpc for HttpStarknetRpc {
         proof_facts: &[Felt],
         proof: &str,
     ) -> Result<FeeBounds, NodeError> {
-        let tx = invoke_v3_tx_json(sender, calldata, &[], nonce, &ZERO_BOUNDS, proof_facts, Some(proof));
+        let tx = invoke_v3_tx_json(
+            sender,
+            calldata,
+            &[],
+            nonce,
+            &ZERO_BOUNDS,
+            proof_facts,
+            Some(proof),
+        );
         let r = self
             .call(
                 "starknet_estimateFee",
@@ -418,9 +427,20 @@ impl StarknetRpc for HttpStarknetRpc {
         // SNIP-36 proof fields (when present) are attached by invoke_v3_tx_json.
         // NOTE: the exact SNIP-36 field names on a given node are not verified
         // here — see the module-level wire-format note.
-        let tx = invoke_v3_tx_json(sender, calldata, signature, nonce, bounds, proof_facts, proof);
+        let tx = invoke_v3_tx_json(
+            sender,
+            calldata,
+            signature,
+            nonce,
+            bounds,
+            proof_facts,
+            proof,
+        );
         let r = self
-            .call("starknet_addInvokeTransaction", json!({ "invoke_transaction": tx }))
+            .call(
+                "starknet_addInvokeTransaction",
+                json!({ "invoke_transaction": tx }),
+            )
             .await?;
         Self::parse_felt(&r["transaction_hash"], "transaction_hash")
     }
@@ -474,7 +494,8 @@ impl StarknetRpc for HttpStarknetRpc {
         constructor_calldata: &[Felt],
         salt: &Felt,
     ) -> Result<FeeBounds, NodeError> {
-        let tx = Self::deploy_account_tx_json(class_hash, constructor_calldata, salt, &[], &ZERO_BOUNDS);
+        let tx =
+            Self::deploy_account_tx_json(class_hash, constructor_calldata, salt, &[], &ZERO_BOUNDS);
         let r = self
             .call(
                 "starknet_estimateFee",
@@ -495,7 +516,8 @@ impl StarknetRpc for HttpStarknetRpc {
         signature: &[Felt],
         bounds: &FeeBounds,
     ) -> Result<Felt, NodeError> {
-        let tx = Self::deploy_account_tx_json(class_hash, constructor_calldata, salt, signature, bounds);
+        let tx =
+            Self::deploy_account_tx_json(class_hash, constructor_calldata, salt, signature, bounds);
         let r = self
             .call(
                 "starknet_addDeployAccountTransaction",
@@ -512,8 +534,14 @@ impl StarknetRpc for HttpStarknetRpc {
         contract_class: &Value,
         nonce: &Felt,
     ) -> Result<FeeBounds, NodeError> {
-        let tx =
-            declare_v3_tx_json(sender, compiled_class_hash, Some(contract_class), &[], nonce, &ZERO_BOUNDS);
+        let tx = declare_v3_tx_json(
+            sender,
+            compiled_class_hash,
+            Some(contract_class),
+            &[],
+            nonce,
+            &ZERO_BOUNDS,
+        );
         let r = self
             .call(
                 "starknet_estimateFee",
@@ -544,7 +572,10 @@ impl StarknetRpc for HttpStarknetRpc {
             bounds,
         );
         let r = self
-            .call("starknet_addDeclareTransaction", json!({ "declare_transaction": tx }))
+            .call(
+                "starknet_addDeclareTransaction",
+                json!({ "declare_transaction": tx }),
+            )
             .await?;
         Self::parse_felt(&r["transaction_hash"], "transaction_hash")
     }

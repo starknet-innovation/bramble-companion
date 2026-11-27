@@ -128,7 +128,11 @@ impl SettingsStore {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let mtime = file_mtime(&path);
-        SettingsStore { path, inner: RwLock::new(settings), mtime: Mutex::new(mtime) }
+        SettingsStore {
+            path,
+            inner: RwLock::new(settings),
+            mtime: Mutex::new(mtime),
+        }
     }
 
     /// Reload from disk if the file changed since we last read it — so external
@@ -156,7 +160,10 @@ impl SettingsStore {
 
     /// Backend choice read synchronously at startup (uncontended). Empty if unset.
     pub fn prover_backend_blocking(&self) -> String {
-        self.inner.try_read().map(|s| s.prover_backend.clone()).unwrap_or_default()
+        self.inner
+            .try_read()
+            .map(|s| s.prover_backend.clone())
+            .unwrap_or_default()
     }
 
     /// Best-effort synchronous snapshot of the settings (uncontended). `None` if
@@ -189,7 +196,10 @@ impl SettingsStore {
         if let Some(p) = self.path.parent() {
             std::fs::create_dir_all(p)?;
         }
-        std::fs::write(&self.path, serde_json::to_string_pretty(&s).unwrap_or_default())?;
+        std::fs::write(
+            &self.path,
+            serde_json::to_string_pretty(&s).unwrap_or_default(),
+        )?;
         // API keys and a testnet screener key live here: owner-only, like config.json.
         #[cfg(unix)]
         {
@@ -220,7 +230,12 @@ mod tests {
             ..NetworkConfig::default()
         };
         let out = format!("{cfg:?}");
-        for secret in ["prover-secret", "starkscan-secret", "avnu-secret", "cafebabe"] {
+        for secret in [
+            "prover-secret",
+            "starkscan-secret",
+            "avnu-secret",
+            "cafebabe",
+        ] {
             assert!(!out.contains(secret), "{out}");
         }
         assert!(out.contains("0x123") && out.contains("<redacted>"), "{out}");
@@ -230,11 +245,17 @@ mod tests {
     #[tokio::test]
     async fn settings_file_is_owner_only() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("bramble-companion-settings-perm-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "bramble-companion-settings-perm-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         let store = SettingsStore::load(dir.join("settings.json"));
         store.update(Settings::default()).await.unwrap();
-        let mode = std::fs::metadata(dir.join("settings.json")).unwrap().permissions().mode();
+        let mode = std::fs::metadata(dir.join("settings.json"))
+            .unwrap()
+            .permissions()
+            .mode();
         assert_eq!(mode & 0o777, 0o600);
         let _ = std::fs::remove_dir_all(&dir);
     }
